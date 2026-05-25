@@ -70,3 +70,7 @@ Thumbs.db
 # PyPI credentials
 .pypirc
 
+# Internal/author-only docs
+GITHUB_TAGS_GUIDE.md
+PUBLISHING_GUIDE.md
+PYPI_PUBLISHING.md
