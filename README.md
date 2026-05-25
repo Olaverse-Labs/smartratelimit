@@ -1,7 +1,7 @@
 # smartratelimit
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/olastephen/smartratelimit/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/olastephen/smartratelimit/blob/main/LICENSE)
 [![PyPI version](https://badge.fury.io/py/smartratelimit.svg)](https://badge.fury.io/py/smartratelimit)
 [![PyPI downloads](https://img.shields.io/pypi/dm/smartratelimit.svg)](https://pypi.org/project/smartratelimit/)
 
@@ -388,7 +388,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](https://github.com/olas
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the Apache License 2.0.
 
 See the [LICENSE](https://github.com/olastephen/smartratelimit/blob/main/LICENSE) file for the full license text.
 
