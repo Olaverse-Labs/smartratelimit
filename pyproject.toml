@@ -35,15 +35,20 @@ redis = ["redis>=4.0.0"]
 httpx = ["httpx>=0.24.0"]
 aiohttp = ["aiohttp>=3.8.0"]
 all = ["redis>=4.0.0", "httpx>=0.24.0", "aiohttp>=3.8.0"]
+# Documentation site (mkdocs build / serve / gh-deploy)
+docs = ["mkdocs-material>=9.5"]
 
 [project.scripts]
 smartratelimit = "smartratelimit.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/olastephen/smartratelimit"
-Documentation = "https://github.com/olastephen/smartratelimit#readme"
-Repository = "https://github.com/olastephen/smartratelimit"
-Issues = "https://github.com/olastephen/smartratelimit/issues"
+# Documentation is listed first and by name so PyPI renders it in the sidebar —
+# the docs site is otherwise reachable only from inside the README.
+Documentation = "https://olaverse-labs.github.io/smartratelimit/"
+Homepage = "https://olaverse.co.uk"
+Repository = "https://github.com/Olaverse-Labs/smartratelimit"
+Changelog = "https://olaverse-labs.github.io/smartratelimit/changelog/"
+Issues = "https://github.com/Olaverse-Labs/smartratelimit/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/olastephen/smartratelimit/blob/main/LICENSE)
 [![PyPI version](https://badge.fury.io/py/smartratelimit.svg)](https://badge.fury.io/py/smartratelimit)
 [![PyPI downloads](https://img.shields.io/pypi/dm/smartratelimit.svg)](https://pypi.org/project/smartratelimit/)
+[![Docs](https://img.shields.io/badge/docs-olaverse--labs.github.io-7C5CFF.svg)](https://olaverse-labs.github.io/smartratelimit/)
 
 A Python library that automatically manages API rate limits, preventing 429 errors and optimizing API usage without requiring developers to manually track or implement rate limiting logic.
 
@@ -221,17 +222,17 @@ print(prometheus_metrics)
 ### CLI Tools
 
 ```bash
-# Check rate limit status
-smartratelimit status --endpoint api.github.com
+# Probe an endpoint to see what rate limits it advertises
+smartratelimit probe https://api.github.com/users/octocat
 
-# Probe endpoint for rate limits
-smartratelimit probe https://api.github.com/users
+# Check stored rate limit status (use the same backend your app writes to)
+smartratelimit --storage "sqlite:///ratelimit.db" status api.github.com
 
-# Clear stored rate limits
-smartratelimit clear --endpoint api.github.com
+# Clear stored rate limits for one endpoint
+smartratelimit --storage "sqlite:///ratelimit.db" clear api.github.com
 
 # Clear all rate limits
-smartratelimit clear
+smartratelimit --storage "sqlite:///ratelimit.db" clear
 ```
 
 ## Supported APIs
@@ -394,22 +395,24 @@ See the [LICENSE](https://github.com/olastephen/smartratelimit/blob/main/LICENSE
 
 ## Documentation
 
-Comprehensive documentation is available in the `docs/` directory:
+Full documentation lives at **[olaverse-labs.github.io/smartratelimit](https://olaverse-labs.github.io/smartratelimit/)**:
 
-- 📖 [Quick Start Guide](https://github.com/olastephen/smartratelimit/blob/main/docs/QUICK_START.md) - Get started in 5 minutes
-- 📚 [Complete Tutorial](https://github.com/olastephen/smartratelimit/blob/main/docs/TUTORIAL.md) - Step-by-step guide
-- 📋 [API Reference](https://github.com/olastephen/smartratelimit/blob/main/docs/API_REFERENCE.md) - Complete API documentation
-- 💻 [Examples](https://github.com/olastephen/smartratelimit/blob/main/docs/EXAMPLES.md) - Real-world examples with free APIs
-- 💾 [Storage Backends](https://github.com/olastephen/smartratelimit/blob/main/docs/STORAGE_BACKENDS.md) - SQLite and Redis guide
-- ⚡ [Async Guide](https://github.com/olastephen/smartratelimit/blob/main/docs/ASYNC_GUIDE.md) - Async/await usage
-- 🔄 [Retry Strategies](https://github.com/olastephen/smartratelimit/blob/main/docs/RETRY_STRATEGIES.md) - Advanced retry logic
-- 📊 [Metrics Guide](https://github.com/olastephen/smartratelimit/blob/main/docs/METRICS_GUIDE.md) - Collecting and exporting metrics
-- 🛠️ [CLI Guide](https://github.com/olastephen/smartratelimit/blob/main/docs/CLI_GUIDE.md) - Command-line tools
-- 🎯 [Advanced Features](https://github.com/olastephen/smartratelimit/blob/main/docs/ADVANCED_FEATURES.md) - Advanced patterns
+- 📖 [Quick Start](https://olaverse-labs.github.io/smartratelimit/quickstart/) - Get started in 5 minutes
+- 🧠 [How it works](https://olaverse-labs.github.io/smartratelimit/concepts/) - Detection, token bucket, storage
+- 💾 [Which storage backend?](https://olaverse-labs.github.io/smartratelimit/choosing/) - Memory vs SQLite vs Redis
+- 📡 [Detection & Headers](https://olaverse-labs.github.io/smartratelimit/detection/) - Supported headers and custom mapping
+- ⚡ [Async Guide](https://olaverse-labs.github.io/smartratelimit/async/) - httpx and aiohttp
+- 🔄 [Retry Strategies](https://olaverse-labs.github.io/smartratelimit/retry/) - Backoff configuration
+- 📊 [Metrics](https://olaverse-labs.github.io/smartratelimit/metrics/) - Prometheus and JSON export
+- 🛠️ [CLI](https://olaverse-labs.github.io/smartratelimit/cli/) - `status`, `probe`, `clear`
+- 💻 [Recipes](https://olaverse-labs.github.io/smartratelimit/examples/) - Batch jobs, scrapers, Celery, FastAPI
+- 📋 [API Reference](https://olaverse-labs.github.io/smartratelimit/api/) - Every class and method
+
+The site is built with MkDocs from the [`docs/`](docs/) directory and deploys on push to `main`.
 
 ## Support
 
-- 📖 [Documentation](https://github.com/olastephen/smartratelimit)
+- 📖 [Documentation](https://olaverse-labs.github.io/smartratelimit/)
 - 🐛 [Issue Tracker](https://github.com/olastephen/smartratelimit/issues)
 - 💬 [Discussions](https://github.com/olastephen/smartratelimit/discussions)
 

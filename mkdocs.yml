@@ -1,0 +1,113 @@
+site_name: smartratelimit
+site_description: Automatic API rate limit management for Python — detects limits from response headers, waits instead of 429ing, and shares state across processes.
+site_url: https://olaverse-labs.github.io/smartratelimit/
+repo_url: https://github.com/Olaverse-Labs/smartratelimit
+repo_name: Olaverse-Labs/smartratelimit
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: assets/logo.png
+  favicon: assets/logo.png
+
+  font:
+    text: IBM Plex Sans
+    code: IBM Plex Mono
+
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - navigation.footer
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+    - announce.dismiss
+
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: deep purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+  icon:
+    repo: fontawesome/brands/github
+    admonition:
+      warning: octicons/alert-16
+      tip: octicons/light-bulb-16
+      note: octicons/info-16
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Olaverse-Labs
+      name: Olaverse Labs on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/smartratelimit/
+      name: smartratelimit on PyPI
+
+  generator: false
+
+markdown_extensions:
+  - tables
+  - attr_list
+  - md_in_html
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      use_pygments: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+# Substitutes {{ smartratelimit_version }} from smartratelimit/__init__.py at
+# build time, so the version badge can't drift behind a release.
+hooks:
+  - hooks/version.py
+
+plugins:
+  - search:
+      lang: en
+
+nav:
+  - 🏠 Main Site: https://www.olaverse.co.uk/
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: quickstart.md
+    - How it works: concepts.md
+    - Which storage backend?: choosing.md
+  - Guides:
+    - Detection & Headers: detection.md
+    - Storage Backends: storage.md
+    - Async (httpx / aiohttp): async.md
+    - Retry Strategies: retry.md
+    - Metrics & Monitoring: metrics.md
+    - CLI: cli.md
+  - Recipes: examples.md
+  - API Reference: api.md
+  - Changelog: changelog.md
