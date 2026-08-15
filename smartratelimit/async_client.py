@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Union
 from urllib.parse import urlparse
 
+from requests.structures import CaseInsensitiveDict
+
 from smartratelimit.detector import RateLimitDetector
 from smartratelimit.models import RateLimit, RateLimitStatus, TokenBucket
 from smartratelimit.storage import StorageBackend
@@ -126,7 +128,16 @@ class AsyncRateLimiter:
             def __init__(self, response):
                 self.url = str(response.url) if hasattr(response, "url") else response.url
                 self.status_code = response.status_code if hasattr(response, "status_code") else getattr(response, "status", 200)
-                self.headers = dict(response.headers) if hasattr(response, "headers") else {}
+                # CaseInsensitiveDict, not dict: the detector matches header
+                # names literally ("X-RateLimit-Limit"), while httpx lowercases
+                # them and HTTP/2 requires the wire format to be lowercase. A
+                # plain dict makes every lookup miss, so nothing is ever
+                # detected and the async limiter silently stops limiting.
+                self.headers = (
+                    CaseInsensitiveDict(response.headers)
+                    if hasattr(response, "headers")
+                    else CaseInsensitiveDict()
+                )
 
         mock_response = MockResponse(response)
         detected = self._detector.detect_from_response(mock_response)
@@ -300,7 +311,13 @@ class AsyncRateLimiter:
                             async with session.request(method, url, **kwargs) as retry_response:
                                 body = await retry_response.read()
                                 self._update_from_response(retry_response)
-                                return retry_response
+                                # Fall through so the retried response is wrapped
+                                # like every other one. Returning the raw
+                                # ClientResponse here handed callers an object
+                                # with no .status_code and a spent body, so code
+                                # that worked on the normal path broke the moment
+                                # a 429 was retried.
+                                response = retry_response
                     except (ValueError, TypeError):
                         pass
 

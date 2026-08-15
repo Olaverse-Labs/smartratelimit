@@ -206,3 +206,112 @@ class TestAsyncRateLimiter:
         with pytest.raises(RateLimitExceeded):
             await limiter._wait_for_token(bucket, "https://api.example.com/test")
 
+
+    @pytest.mark.asyncio
+    async def test_detects_lowercase_rate_limit_headers(self):
+        """Headers arriving lowercase (HTTP/2, httpx) must still be detected.
+
+        Regression: the detector matches header names literally, so converting
+        the client's case-insensitive headers to a plain dict made every lookup
+        miss and the async limiter silently stopped limiting.
+        """
+        limiter = AsyncRateLimiter()
+
+        mock_response = Mock()
+        mock_response.url = "https://api.example.com/users"
+        mock_response.status_code = 200
+        mock_response.headers = {
+            "x-ratelimit-limit": "5000",
+            "x-ratelimit-remaining": "4999",
+            "x-ratelimit-reset": "3600",
+        }
+
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_response)
+
+        await limiter.arequest_httpx(mock_client, "GET", "https://api.example.com/users")
+
+        status = limiter.get_status("api.example.com")
+        assert status is not None, "lowercase rate limit headers were not detected"
+        assert status.limit == 5000
+        assert status.remaining == 4999
+
+    @pytest.mark.asyncio
+    async def test_detects_headers_from_real_httpx_headers_object(self):
+        """The real httpx.Headers type (not a dict) must be understood."""
+        httpx = pytest.importorskip("httpx")
+
+        limiter = AsyncRateLimiter()
+
+        mock_response = Mock()
+        mock_response.url = "https://api.example.com/users"
+        mock_response.status_code = 200
+        mock_response.headers = httpx.Headers(
+            {
+                "X-RateLimit-Limit": "100",
+                "X-RateLimit-Remaining": "42",
+                "X-RateLimit-Reset": "60",
+            }
+        )
+
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_response)
+
+        await limiter.arequest_httpx(mock_client, "GET", "https://api.example.com/users")
+
+        status = limiter.get_status("api.example.com")
+        assert status is not None
+        assert status.limit == 100
+        assert status.remaining == 42
+
+    @pytest.mark.asyncio
+    async def test_aiohttp_429_retry_returns_wrapped_response(self):
+        """A retried 429 must come back in the same wrapper as any other response.
+
+        Regression: the retry path returned the raw ClientResponse, which has no
+        .status_code, so caller code that worked on the normal path broke as
+        soon as a request was retried.
+        """
+
+        class FakeResponse:
+            def __init__(self, status, headers, body):
+                self.status = status
+                self.headers = headers
+                self.body = body
+                self.url = "https://api.example.com/test"
+
+            async def read(self):
+                return self.body
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc_info):
+                return False
+
+        class FakeSession:
+            def __init__(self, responses):
+                self.responses = list(responses)
+                self.call_count = 0
+
+            def request(self, method, url, **kwargs):
+                self.call_count += 1
+                return self.responses.pop(0)
+
+        limiter = AsyncRateLimiter()
+        session = FakeSession(
+            [
+                FakeResponse(429, {"Retry-After": "1"}, b'{"error": "slow down"}'),
+                FakeResponse(200, {}, b'{"ok": true}'),
+            ]
+        )
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            response = await limiter.arequest_aiohttp(
+                session, "GET", "https://api.example.com/test"
+            )
+
+        assert session.call_count == 2
+        assert response.status_code == 200
+        assert response.status == 200
+        assert await response.json() == {"ok": True}
