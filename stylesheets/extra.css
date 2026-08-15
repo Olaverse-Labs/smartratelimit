@@ -1,0 +1,792 @@
+/* =====================================================================
+   Olaverse Docs — "Paper / Ink" Theme
+   Shares its design language with the marketing site: hairline borders,
+   Space Grotesk display type, IBM Plex Sans/Mono, a pink→purple→cyan
+   signal gradient, and flat grid-cell layout instead of glassy cards.
+   ===================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* ── Design tokens — light ("paper") ─────────────────────────────────── */
+:root {
+  --ov-disp:   'Space Grotesk', 'IBM Plex Sans', sans-serif;
+
+  --ov-paper:       #EFEBE4;
+  --ov-paper-raise: #F5F2EC;
+  --ov-ink:         #1C1917;
+  --ov-ink-soft:    #57514A;
+  --ov-ink-mute:    #8A8378;
+  --ov-line:        rgba(28,25,23,.12);
+  --ov-line-soft:   rgba(28,25,23,.07);
+
+  --ov-pink:   #E84B8A;
+  --ov-purple: #7C5CFF;
+  --ov-cyan:   #1FB9C9;
+  --ov-grad:      linear-gradient(90deg,var(--ov-pink),var(--ov-purple),var(--ov-cyan));
+  --ov-grad-text: linear-gradient(135deg,var(--ov-pink),var(--ov-purple),var(--ov-cyan));
+
+  --ov-radius:    2px;
+  --ov-code-bg:   #211D1A;
+  --ov-code-fg:   #D8D2C8;
+}
+
+/* ── Design tokens — dark ("ink") ────────────────────────────────────── */
+[data-md-color-scheme="slate"] {
+  --ov-paper:       #1A1714;
+  --ov-paper-raise: #211D1A;
+  --ov-ink:         #EFEBE4;
+  --ov-ink-soft:    #B7B0A5;
+  --ov-ink-mute:    #8A8378;
+  --ov-line:        rgba(239,235,228,.14);
+  --ov-line-soft:   rgba(239,235,228,.08);
+
+  --ov-pink:   #FF6FA8;
+  --ov-purple: #9C85FF;
+  --ov-cyan:   #3DD8E8;
+}
+
+/* ── Base typography ───────────────────────────────────────────────── */
+body, .md-typeset {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+code, pre, .md-typeset code {
+  font-family: 'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace !important;
+}
+.md-typeset h1, .md-typeset h2, .md-typeset h3, .md-typeset h4,
+.md-header__title, .md-nav__title, .ov-hero-title, .ov-card-title,
+.ov-compare-title {
+  font-family: var(--ov-disp) !important;
+}
+
+/* ── Color scheme mapping ─────────────────────────────────────────────
+   Material reads these vars for nearly everything; we point them at the
+   paper/ink tokens above so the whole chrome inherits the palette.       */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:        var(--ov-ink);
+  --md-primary-bg-color:        var(--ov-paper);
+  --md-default-bg-color:        var(--ov-paper);
+  --md-default-fg-color:        var(--ov-ink);
+  --md-default-fg-color--light: var(--ov-ink-soft);
+  --md-default-fg-color--lighter: var(--ov-ink-mute);
+  --md-typeset-color:           var(--ov-ink);
+  --md-typeset-a-color:         var(--ov-purple);
+  --md-nav-bg:                  var(--ov-paper);
+  --md-code-bg-color:           var(--ov-code-bg);
+  --md-code-fg-color:           var(--ov-code-fg);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        var(--ov-ink);
+  --md-primary-bg-color:        var(--ov-paper);
+  --md-default-bg-color:        var(--ov-paper);
+  --md-default-fg-color:        var(--ov-ink);
+  --md-default-fg-color--light: var(--ov-ink-soft);
+  --md-default-fg-color--lighter: var(--ov-ink-mute);
+  --md-typeset-color:           var(--ov-ink);
+  --md-typeset-a-color:         var(--ov-purple);
+  --md-nav-bg:                  var(--ov-paper);
+  --md-code-bg-color:           var(--ov-code-bg);
+  --md-code-fg-color:           var(--ov-code-fg);
+}
+
+body { background: var(--ov-paper); }
+
+/* ── Header ────────────────────────────────────────────────────────── */
+.md-header {
+  background: var(--ov-paper) !important;
+  border-bottom: 1px solid var(--ov-line);
+  box-shadow: none !important;
+  color: var(--ov-ink) !important;
+  position: relative;
+  overflow: hidden;
+}
+/* the signal pulse — a nod to the marketing site's traveling gradient line */
+.md-header::after {
+  content: "";
+  position: absolute;
+  left: -240px; bottom: -1px;
+  height: 1px; width: 220px;
+  background: linear-gradient(90deg,transparent,var(--ov-pink),var(--ov-purple),var(--ov-cyan),transparent);
+  animation: ov-travel-x 9s linear infinite;
+  pointer-events: none;
+}
+@keyframes ov-travel-x { 0%{left:-240px} 100%{left:100%} }
+@media (prefers-reduced-motion: reduce) { .md-header::after { animation: none; opacity: 0; } }
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg { height: 1.7rem; }
+
+.md-header__title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ov-ink) !important;
+}
+
+/* Search */
+.md-search__form {
+  border-radius: var(--ov-radius) !important;
+  background: var(--ov-paper-raise) !important;
+  border: 1px solid var(--ov-line);
+  transition: border-color .15s;
+}
+.md-search__form:focus-within {
+  border-color: var(--ov-purple);
+  box-shadow: none;
+}
+.md-search__input { color: var(--ov-ink) !important; font-family: 'IBM Plex Mono', monospace !important; font-size: .8rem !important; }
+.md-search__input::placeholder { color: var(--ov-ink-mute) !important; opacity: 1; }
+.md-search-result__meta,
+.md-search-result__article { background: var(--ov-paper) !important; }
+
+/* ── Tabs ──────────────────────────────────────────────────────────── */
+.md-tabs {
+  background: var(--ov-paper) !important;
+  border-bottom: 1px solid var(--ov-line);
+}
+.md-tabs__link {
+  color: var(--ov-ink-soft) !important;
+  font-weight: 500;
+  font-size: 0.85rem;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: .01em;
+  transition: color 0.15s;
+}
+.md-tabs__link--active,
+.md-tabs__link:hover { color: var(--ov-ink) !important; }
+.md-tabs__item--active .md-tabs__link { position: relative; }
+.md-tabs__item--active .md-tabs__link::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -.65rem;
+  height: 2px; background: var(--ov-grad);
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────── */
+.md-sidebar { background: transparent !important; }
+
+.md-nav__title {
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ov-ink-mute) !important;
+  padding: 0.8rem 0 0.4rem;
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+
+.md-nav__link {
+  font-size: 0.86rem;
+  border-radius: var(--ov-radius);
+  padding: 0.28rem 0.55rem;
+  transition: background 0.15s, color 0.15s;
+  margin: 1px 0;
+  border-left: 2px solid transparent;
+}
+.md-nav__link--active {
+  font-weight: 600;
+  color: var(--ov-purple) !important;
+  background: transparent !important;
+  border-left-color: var(--ov-purple);
+}
+.md-nav__link:hover:not(.md-nav__link--active) {
+  background: var(--ov-paper-raise) !important;
+  color: var(--ov-ink) !important;
+}
+
+/* ── Content ───────────────────────────────────────────────────────── */
+.md-content__inner { max-width: 880px; }
+
+.md-typeset {
+  font-size: 1.0rem;
+  line-height: 1.7;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.25rem;
+  line-height: 1.15;
+}
+
+.md-typeset h2 {
+  font-weight: 700;
+  font-size: 1.3rem;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--ov-line);
+  letter-spacing: -0.01em;
+  position: relative;
+}
+.md-typeset h2::before,
+.md-typeset h2::after {
+  content: "";
+  position: absolute;
+  bottom: -4.5px;
+  width: 9px; height: 9px;
+  background:
+    linear-gradient(var(--ov-purple) 0 0) center / 1px 9px no-repeat,
+    linear-gradient(var(--ov-purple) 0 0) center / 9px 1px no-repeat;
+  opacity: .55;
+}
+.md-typeset h2::before { left: 0; }
+.md-typeset h2::after { display: none; }
+
+.md-typeset h3 {
+  font-weight: 600;
+  font-size: 1.08rem;
+  margin-top: 1.75rem;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset h4 { font-weight: 600; font-size: 0.94rem; }
+
+.md-typeset hr {
+  border: none;
+  border-top: 1px solid var(--ov-line);
+  margin: 2.5rem 0;
+}
+
+/* ── Inline code ───────────────────────────────────────────────────── */
+.md-typeset code:not(pre code) {
+  background: rgba(124, 92, 255, 0.08);
+  color: var(--ov-purple);
+  border-radius: 3px;
+  padding: 0.15em 0.4em;
+  font-size: 0.84em;
+  font-weight: 500;
+  border: 1px solid rgba(124, 92, 255, 0.16);
+}
+
+/* ── Code blocks — always the marketing site's dark console, in both schemes ── */
+.md-typeset pre,
+.md-typeset .highlight {
+  border-radius: var(--ov-radius) !important;
+  border: 1px solid var(--ov-line) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+  background: var(--ov-code-bg) !important;
+}
+.md-typeset .highlight code,
+.md-typeset pre code {
+  background: transparent !important;
+  color: var(--ov-code-fg) !important;
+  border: none !important;
+  padding: 0 !important;
+}
+.md-clipboard { color: #8A8378 !important; }
+.md-clipboard:hover { color: var(--ov-cyan) !important; }
+
+/* The console above is deliberately dark in BOTH schemes, but Material maps
+   several token types — punctuation, comment, generic, variable, operator — to
+   --md-default-fg-color--light, which is scheme-dependent. In light mode that
+   resolves to #57514A sitting on #211D1A: a 2.14:1 contrast ratio, effectively
+   invisible. Pin the console's own foreground variables so they track the dark
+   background rather than the page scheme. */
+.md-typeset pre,
+.md-typeset .highlight {
+  --md-default-fg-color--light:   #A79F94;
+  --md-code-fg-color:             var(--ov-code-fg);
+  --md-code-hl-punctuation-color: #A79F94;
+  --md-code-hl-comment-color:     #9C9488;
+  --md-code-hl-generic-color:     #A79F94;
+  --md-code-hl-variable-color:    var(--ov-code-fg);
+  --md-code-hl-operator-color:    #C792EA;
+}
+
+/* ── Pygments syntax tokens — mapped to the marketing site's console palette ──
+   Every colour here is checked against the #211D1A console at >= 4.5:1 (WCAG AA
+   for body text). Comments are the most muted at 5.58:1 — subordinate, but still
+   legible; they were previously #787168, which was only 3.47:1. */
+.highlight .c, .highlight .c1, .highlight .cm, .highlight .cs  { color: #9C9488; font-style: italic; }
+.highlight .k, .highlight .kd, .highlight .kn, .highlight .kp,
+.highlight .kr, .highlight .kc { color: #C792EA; font-weight: 500; }
+.highlight .n   { color: #D8D2C8; }
+.highlight .nb  { color: #82AAFF; }
+.highlight .nc  { color: #82AAFF; }
+.highlight .nf, .highlight .fm { color: #82AAFF; }
+.highlight .nn, .highlight .nm, .highlight .na { color: #82AAFF; }
+.highlight .bp  { color: #C792EA; }
+.highlight .vm, .highlight .nv { color: #D8D2C8; }
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sa,
+.highlight .sb, .highlight .sc, .highlight .dl, .highlight .sd,
+.highlight .se, .highlight .si, .highlight .ss { color: #7FD1C0; }
+.highlight .m, .highlight .mi, .highlight .mf,
+.highlight .mh, .highlight .mo { color: #1FB9C9; }
+.highlight .o, .highlight .ow { color: #C792EA; }
+.highlight .nt { color: #E84B8A; }
+.highlight .l, .highlight .ld { color: #7FD1C0; }
+.highlight .err { color: #E84B8A; background: rgba(232,75,138,0.12); }
+
+/* Tokens the palette above never named. Punctuation is the common one — every
+   bracket, comma, dot and equals sign in a snippet — and it was the worst hit
+   by the scheme-dependent fallback. */
+.highlight .p, .highlight .pi { color: #A79F94; }
+.highlight .w  { color: inherit; }
+.highlight .go { color: #A79F94; }             /* generic output, e.g. >>> results */
+.highlight .gp { color: #9C9488; }             /* generic prompt, e.g. >>> */
+.highlight .gh, .highlight .gu { color: #82AAFF; }
+.highlight .gi { color: #7FD1C0; }             /* diff insert */
+.highlight .gd { color: #E84B8A; }             /* diff delete */
+.highlight .gs { font-weight: 600; }
+.highlight .ge { font-style: italic; }
+
+/* ── Admonitions ───────────────────────────────────────────────────── */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: var(--ov-radius) !important;
+  border-left-width: 3px !important;
+  box-shadow: none !important;
+  font-size: 0.95rem;
+  background: var(--ov-paper-raise) !important;
+  border: 1px solid var(--ov-line) !important;
+}
+.md-typeset .admonition p,
+.md-typeset .admonition li,
+.md-typeset details p,
+.md-typeset details li {
+  color: var(--ov-ink) !important;
+}
+.md-typeset .admonition.warning,
+.md-typeset details.warning { border-left-color: #C9902F !important; }
+.md-typeset .admonition.tip,
+.md-typeset details.tip { border-left-color: var(--ov-purple) !important; }
+.md-typeset .admonition.note,
+.md-typeset details.note { border-left-color: var(--ov-cyan) !important; }
+
+/* ── Tables ────────────────────────────────────────────────────────── */
+.md-typeset table:not([class]) {
+  border-radius: var(--ov-radius);
+  overflow: hidden;
+  border: 1px solid var(--ov-line);
+  box-shadow: none;
+  width: 100%;
+}
+.md-typeset table:not([class]) th {
+  background: var(--ov-paper-raise);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--ov-ink) !important;
+  white-space: nowrap;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid var(--ov-line);
+}
+.md-typeset table:not([class]) td {
+  color: var(--ov-ink);
+  padding: 0.55rem 0.8rem;
+  border-top: 1px solid var(--ov-line-soft);
+}
+.md-typeset table:not([class]) tr:first-child td { border-top: none; }
+.md-typeset table:not([class]) tr:hover td {
+  background: rgba(124, 92, 255, 0.05);
+}
+
+/* ── Content tabs (=== "Tab" syntax) ───────────────────────────────── */
+.md-typeset .tabbed-set {
+  border: 1px solid var(--ov-line);
+  border-radius: var(--ov-radius);
+}
+.md-typeset .tabbed-labels {
+  border-bottom: 1px solid var(--ov-line);
+}
+.md-typeset .tabbed-set > input:checked + .tabbed-content .tabbed-block {
+  border-radius: 0;
+}
+.md-typeset .tabbed-labels > label {
+  font-size: 0.83rem;
+  font-weight: 500;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.md-typeset .tabbed-labels > label:hover { color: var(--ov-purple); }
+.md-typeset .tabbed-set > input:checked ~ .tabbed-labels > label {
+  color: var(--ov-purple);
+}
+.md-typeset .tabbed-labels::before { background: var(--ov-grad) !important; }
+
+/* ── Buttons — rectangular ink/paper, like the marketing site's .btn ── */
+.md-typeset .md-button {
+  border-radius: var(--ov-radius) !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+  padding: 0.55em 1.4em !important;
+  transition: background .15s, color .15s !important;
+  border: 1px solid var(--ov-ink) !important;
+  color: var(--ov-ink) !important;
+  background: transparent !important;
+}
+.md-typeset .md-button:hover {
+  border-color: var(--ov-ink) !important;
+  color: var(--ov-paper) !important;
+  background: var(--ov-ink) !important;
+  transform: none;
+}
+.md-typeset .md-button--primary {
+  background: var(--ov-ink) !important;
+  color: var(--ov-paper) !important;
+  border: 1px solid var(--ov-ink) !important;
+  box-shadow: none !important;
+}
+.md-typeset .md-button--primary:hover {
+  background: transparent !important;
+  color: var(--ov-ink) !important;
+  border: 1px solid var(--ov-ink) !important;
+  box-shadow: none !important;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────── */
+.md-footer {
+  background: transparent !important;
+  border-top: 1px solid var(--ov-line);
+  margin-top: 4rem;
+}
+.md-footer-meta { background: transparent !important; }
+
+.ov-footer-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding: 2rem 1rem 1rem;
+  font-size: 0.82rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ov-ink-mute);
+}
+.ov-footer-brand a {
+  color: var(--ov-purple);
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+.ov-footer-brand a:hover { opacity: 0.7; }
+
+.ov-footer-brand .ov-logo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--ov-ink);
+  color: var(--ov-paper) !important;
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem 0.3rem 0.45rem;
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-decoration: none !important;
+  transition: opacity 0.15s;
+}
+.ov-footer-brand .ov-logo-pill:hover { opacity: 0.85; }
+.ov-footer-brand .ov-logo-pill img { width: 18px; height: 18px; object-fit: contain; }
+
+/* ── Scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 255, 0.22);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(124, 92, 255, 0.4); }
+
+/* ================================================================== */
+/*  HERO (index page)                                                  */
+/* ================================================================== */
+.ov-hero {
+  text-align: center;
+  padding: 4.5rem 1.5rem 3.5rem;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ov-line);
+  border-radius: var(--ov-radius);
+  background: var(--ov-paper-raise);
+  margin-bottom: 3.5rem;
+}
+
+.ov-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--ov-ink-soft);
+  padding: 0.3em 0;
+  margin-bottom: 1.5rem;
+  background: none;
+  border: none;
+}
+.ov-hero-badge::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ov-cyan);
+  flex-shrink: 0;
+}
+
+.ov-hero-title {
+  font-size: clamp(2.1rem, 5.5vw, 3.2rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.08 !important;
+  margin: 0 auto 1rem !important;
+  background: var(--ov-grad-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  border: none !important;
+}
+
+.ov-hero-sub {
+  font-size: 1.1rem;
+  color: var(--ov-ink-soft);
+  font-weight: 400;
+  margin-bottom: 2.25rem;
+  letter-spacing: 0.005em;
+}
+
+.ov-hero-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--ov-paper);
+  border: 1px solid var(--ov-line);
+  border-radius: var(--ov-radius);
+  padding: 0.6rem 1.15rem;
+  margin-bottom: 1.75rem;
+  box-shadow: none;
+}
+
+.ov-hero-install-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--ov-ink);
+  letter-spacing: 0.01em;
+}
+.ov-hero-install-label::before {
+  content: "$ ";
+  color: var(--ov-purple);
+}
+
+.ov-hero-links {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+/* ================================================================== */
+/*  FEATURE GRID (index page) — bordered grid cells, not glass cards   */
+/* ================================================================== */
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0;
+  margin: 2rem 0;
+  border: 1px solid var(--ov-line);
+  border-radius: var(--ov-radius);
+}
+
+.ov-card {
+  background: var(--ov-paper);
+  border: none;
+  border-right: 1px solid var(--ov-line);
+  border-bottom: 1px solid var(--ov-line);
+  border-radius: 0;
+  padding: 1.5rem 1.4rem;
+  transition: background 0.15s;
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.ov-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--ov-grad);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ov-card:hover {
+  transform: none;
+  box-shadow: none;
+  background: var(--ov-paper-raise);
+}
+.ov-card:hover::before { opacity: 1; }
+
+.ov-card-icon {
+  font-size: 1.7rem;
+  margin-bottom: 0.75rem;
+  line-height: 1;
+}
+
+.ov-card-title {
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+  color: var(--ov-ink);
+}
+
+.ov-card-body {
+  font-size: 0.875rem;
+  color: var(--ov-ink-soft);
+  opacity: 1;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.ov-card-link {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ov-purple) !important;
+  text-decoration: none !important;
+  letter-spacing: 0.01em;
+  transition: opacity 0.15s;
+}
+.ov-card-link:hover { opacity: 0.7; }
+
+/* ================================================================== */
+/*  LANGUAGE BADGES — bordered mono tags, like the site's family tags  */
+/* ================================================================== */
+.ov-lang-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0;
+}
+
+.ov-lang-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32em 0.75em;
+  border-radius: var(--ov-radius);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.ov-lang-yor { color: #7C5CFF; border-color: rgba(124,92,255,0.4); }
+.ov-lang-ibo { color: #1FA97A; border-color: rgba(31,169,122,0.4); }
+.ov-lang-hau { color: #C9902F; border-color: rgba(201,144,47,0.4); }
+.ov-lang-pcm { color: #E84B8A; border-color: rgba(232,75,138,0.4); }
+.ov-lang-eng { color: #1FB9C9; border-color: rgba(31,185,201,0.4); }
+
+[data-md-color-scheme="slate"] .ov-lang-yor { color: #B3A2FF; }
+[data-md-color-scheme="slate"] .ov-lang-ibo { color: #4CD6A0; }
+[data-md-color-scheme="slate"] .ov-lang-hau { color: #E8B85C; }
+[data-md-color-scheme="slate"] .ov-lang-pcm { color: #FF8FBC; }
+[data-md-color-scheme="slate"] .ov-lang-eng { color: #6BE2EE; }
+
+.ov-lang-badge code {
+  font-size: 0.9em;
+  opacity: 0.7;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: inherit !important;
+}
+
+/* ================================================================== */
+/*  COMPARE GRID (nlp page)                                            */
+/* ================================================================== */
+.ov-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin: 1.5rem 0;
+  border: 1px solid var(--ov-line);
+  border-radius: var(--ov-radius);
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .ov-compare-grid { grid-template-columns: 1fr; }
+}
+
+.ov-compare-card {
+  background: var(--ov-paper);
+  border: none;
+  border-right: 1px solid var(--ov-line);
+  border-radius: 0;
+  padding: 1.4rem;
+  box-shadow: none;
+}
+.ov-compare-card:last-child { border-right: none; }
+@media (max-width: 640px) {
+  .ov-compare-card { border-right: none; border-bottom: 1px solid var(--ov-line); }
+  .ov-compare-card:last-child { border-bottom: none; }
+}
+
+.ov-compare-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.6rem;
+  color: var(--ov-ink);
+}
+
+.ov-compare-badge {
+  display: inline-block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.22em 0.65em;
+  border-radius: var(--ov-radius);
+  border: 1px solid;
+  margin-bottom: 0.9rem;
+}
+
+.ov-badge-green {
+  background: transparent;
+  color: #1FA97A;
+  border-color: rgba(31,169,122,0.4);
+}
+.ov-badge-purple {
+  background: transparent;
+  color: var(--ov-purple);
+  border-color: rgba(124,92,255,0.4);
+}
+[data-md-color-scheme="slate"] .ov-badge-green { color: #4CD6A0; }
+
+.ov-compare-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ov-compare-card ul li {
+  font-size: 0.875rem;
+  color: var(--ov-ink-soft);
+  padding: 0.28rem 0;
+  border-bottom: 1px solid var(--ov-line-soft);
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  line-height: 1.5;
+}
+.ov-compare-card ul li:last-child { border-bottom: none; }
+.ov-compare-card ul li::before { content: '·'; color: var(--ov-purple); font-weight: 700; flex-shrink: 0; }
+
+/* ================================================================== */
+/*  MODEL TABLE (index page)                                           */
+/* ================================================================== */
+.ov-model-table table { font-size: 0.875rem; }
+
+/* ================================================================== */
+/*  Responsive tweaks                                                  */
+/* ================================================================== */
+@media (max-width: 768px) {
+  .ov-hero { padding: 3.5rem 1rem 2.5rem; }
+  .ov-hero-title { font-size: 2rem !important; }
+  .ov-grid { grid-template-columns: 1fr; }
+  .ov-card { border-right: none; }
+}
