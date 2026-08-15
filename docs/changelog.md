@@ -4,6 +4,26 @@ All notable changes to smartratelimit. The format follows [Keep a Changelog](htt
 
 Current release: **v{{ smartratelimit_version }}**
 
+## 0.3.2
+
+### Fixed
+
+- **`AsyncRateLimiter` was not rate limiting at all in most real deployments.**
+  Header lookups were case-sensitive, but httpx lowercases header names and
+  HTTP/2 requires lowercase on the wire — so limits went undetected against
+  GitHub, Stripe, OpenAI and anything behind a modern proxy, and async requests
+  went out unpaced. Lookups are now case-insensitive, matching the sync limiter.
+- `arequest_aiohttp` returned a raw `ClientResponse` after retrying a 429
+  instead of the usual wrapper, so `response.status_code` raised
+  `AttributeError` on the retry path only.
+
+### Added
+
+- Regression tests for lowercase headers, real `httpx.Headers` objects, and the
+  aiohttp 429 retry return type
+- This documentation site
+- PyPI publishing via GitHub Actions trusted publishing
+
 ## 0.3.1
 
 ### Changed
