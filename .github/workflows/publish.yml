@@ -1,0 +1,81 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  # Pushing a vX.Y.Z tag publishes that version, so a release can be cut from the
+  # command line without going through the GitHub Releases UI.
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The tag is the source of truth for what gets published; if it disagrees
+      # with pyproject.toml the wrong version ships silently under the right tag.
+      - name: Check tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          if [ "$tag" != "$pkg" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match pyproject version $pkg" >&2
+            exit 1
+          fi
+
+      # __version__ is exported from the package and read by the docs hook, so a
+      # release where it lags pyproject.toml ships a wrong self-reported version.
+      - name: Check __version__ matches the package version
+        run: |
+          python - <<'PY'
+          import pathlib, re, tomllib
+
+          pkg = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          src = re.search(
+              r'^__version__\s*=\s*["\']([^"\']+)["\']',
+              pathlib.Path("smartratelimit/__init__.py").read_text(),
+              re.M,
+          ).group(1)
+
+          if src != pkg:
+              raise SystemExit(f"__init__.py says {src} but pyproject.toml says {pkg}")
+          PY
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # required for PyPI trusted publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # 0.3.0 and 0.3.1 were uploaded by hand before this workflow existed,
+          # so back-filled tags would otherwise fail on "file already exists".
+          skip-existing: true
