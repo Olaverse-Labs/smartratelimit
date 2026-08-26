@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import random
 import time
 from enum import Enum
 from typing import Callable, Optional, TypeVar, Union
@@ -31,6 +32,7 @@ class RetryConfig:
         max_delay: float = 60.0,
         backoff_factor: float = 2.0,
         retry_on_status: Optional[list] = None,
+        jitter: float = 0.0,
     ):
         """
         Initialize retry configuration.
@@ -42,6 +44,11 @@ class RetryConfig:
             max_delay: Maximum delay in seconds between retries
             backoff_factor: Factor for exponential backoff
             retry_on_status: HTTP status codes to retry on (default: [429, 503, 504])
+            jitter: Fraction of the delay to randomise, 0.0-1.0. Without it,
+                every client rate-limited by the same window retries at the
+                same instant and collides again; 0.1 spreads them out by up
+                to 10%. Defaults to 0.0 so delays stay exactly predictable
+                unless jitter is asked for.
         """
         self.max_retries = max_retries
         self.strategy = strategy
@@ -49,6 +56,7 @@ class RetryConfig:
         self.max_delay = max_delay
         self.backoff_factor = backoff_factor
         self.retry_on_status = retry_on_status or [429, 503, 504]
+        self.jitter = jitter
 
 
 class RetryHandler:
@@ -79,7 +87,36 @@ class RetryHandler:
         else:
             delay = self.config.base_delay
 
-        return min(delay, self.config.max_delay)
+        delay = min(delay, self.config.max_delay)
+        return self._apply_jitter(delay)
+
+    def _apply_jitter(self, delay: float) -> float:
+        """Randomise a delay by up to ``config.jitter`` in either direction."""
+        if not self.config.jitter or delay <= 0:
+            return delay
+
+        spread = delay * self.config.jitter
+        return max(0.0, delay + random.uniform(-spread, spread))
+
+    def delay_for_attempt(self, attempt: int) -> float:
+        """
+        Seconds to wait before ``attempt`` (1-based), per the configured strategy.
+
+        Args:
+            attempt: Which retry this is -- 1 for the first retry.
+        """
+        return self._calculate_delay(attempt)
+
+    def max_attempts(self) -> int:
+        """
+        Total attempts allowed, including the first.
+
+        ``RetryStrategy.NONE`` means exactly one attempt: retrying with a zero
+        delay would just hammer an endpoint that already said no.
+        """
+        if self.config.strategy == RetryStrategy.NONE:
+            return 1
+        return self.config.max_retries + 1
 
     def should_retry(self, status_code: int, attempt: int) -> bool:
         """Determine if request should be retried."""

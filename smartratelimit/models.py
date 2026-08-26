@@ -14,6 +14,16 @@ class RateLimitStatus:
     remaining: int
     reset_time: Optional[datetime] = None
     window: Optional[timedelta] = None
+    confidence: str = "confirmed"
+    """How this limit was arrived at.
+
+    ``'confirmed'``  the API reported both the limit and its window.
+    ``'estimated'``  the API reported a limit but no usable reset, so the
+                     window was assumed and may be wrong by orders of
+                     magnitude. Configure the real limit with
+                     :meth:`RateLimiter.set_limit` if it matters.
+    ``'configured'`` set explicitly by the caller.
+    """
 
     @property
     def reset_in(self) -> Optional[float]:
@@ -46,6 +56,7 @@ class RateLimit:
     reset_time: datetime
     window: timedelta
     last_updated: datetime = field(default_factory=datetime.utcnow)
+    confidence: str = "confirmed"
 
     def to_status(self) -> RateLimitStatus:
         """Convert to public status object."""
@@ -55,6 +66,7 @@ class RateLimit:
             remaining=self.remaining,
             reset_time=self.reset_time,
             window=self.window,
+            confidence=self.confidence,
         )
 
 

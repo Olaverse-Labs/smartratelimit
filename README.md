@@ -1,7 +1,7 @@
 # smartratelimit
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/olastephen/smartratelimit/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/Olaverse-Labs/smartratelimit/blob/main/LICENSE)
 [![PyPI version](https://badge.fury.io/py/smartratelimit.svg)](https://badge.fury.io/py/smartratelimit)
 [![PyPI downloads](https://img.shields.io/pypi/dm/smartratelimit.svg)](https://pypi.org/project/smartratelimit/)
 [![Docs](https://img.shields.io/badge/docs-olaverse--labs.github.io-7C5CFF.svg)](https://olaverse-labs.github.io/smartratelimit/)
@@ -13,11 +13,11 @@ A Python library that automatically manages API rate limits, preventing 429 erro
 - 🚀 **Automatic Detection**: Automatically detects rate limits from HTTP response headers
 - 🔄 **Zero Configuration**: Works out of the box with most APIs
 - 💾 **Persistent State**: Supports in-memory, SQLite, and Redis storage
-- 🔀 **Multi-Process Safe**: Share rate limits across multiple processes with Redis
+- 🔀 **Multi-Process Safe**: SQLite and Redis backends consume tokens atomically, so workers on one box or many share one honest count
 - 🎯 **Smart Waiting**: Automatically waits when limits are reached
 - 📊 **Status Monitoring**: Check current rate limit status anytime
 - 🔌 **Easy Integration**: Works with `requests`, `httpx`, and `aiohttp`
-- 🔄 **Advanced Retry**: Configurable retry strategies with exponential backoff
+- 🔄 **Advanced Retry**: Honours `Retry-After` (seconds or HTTP-date), then exponential backoff with jitter
 - 📊 **Metrics**: Built-in metrics collection and Prometheus export
 - 🛠️ **CLI Tools**: Command-line interface for monitoring and management
 
@@ -69,6 +69,24 @@ limiter = RateLimiter(storage='redis://localhost:6379/0')
 response = limiter.request('GET', 'https://api.github.com/users')
 ```
 
+#### How the shared count stays honest
+
+Sharing a *store* between workers is not the same as sharing a *limit*. If each
+worker reads the bucket, deducts a token locally and writes it back, two workers
+that read at the same moment both see 10 tokens, both write 9, and two requests
+cost one token.
+
+So the token is consumed inside the store, as one indivisible step:
+
+| Backend | Mechanism | Safe across |
+| --- | --- | --- |
+| `memory` | Consumption under the storage lock | Threads in one process |
+| `sqlite://` | `BEGIN IMMEDIATE` write transaction | Processes on one machine |
+| `redis://` | Server-side Lua script, Redis server clock | Processes on many machines |
+
+The refill-check-consume cycle never crosses a process boundary mid-flight, so a
+bucket cannot be overdrawn no matter how many workers race for it.
+
 ### With Default Limits
 
 ```python
@@ -93,7 +111,9 @@ session.headers.update({'Authorization': 'Bearer token'})
 limiter = RateLimiter()
 limiter.wrap_session(session)
 
-# Now all session requests are rate-limited
+# Now all session requests are rate-limited. The session is still the
+# transport, so its headers, cookies, auth, adapters and connection pool
+# all continue to apply.
 response = session.get('https://api.example.com/data')
 ```
 
@@ -111,6 +131,27 @@ if status:
     print(f"Remaining: {status.remaining}/{status.limit}")
     print(f"Resets in: {status.reset_in} seconds")
     print(f"Utilization: {status.utilization * 100:.1f}%")
+    print(f"Confidence: {status.confidence}")
+```
+
+### Know What Was Detected vs. Guessed
+
+Not every API tells you when its window resets. When one reports a limit but no
+usable reset header, the window has to be assumed — and a limit of `100` could
+mean 100/minute or 100/day. Rather than pass the guess off as a reading,
+`status.confidence` says where the number came from:
+
+| Value | Meaning |
+| --- | --- |
+| `'confirmed'` | The API reported both the limit and its window. |
+| `'estimated'` | The API reported a limit but no reset, so the window was assumed (one hour by default). |
+| `'configured'` | You set it yourself via `set_limit()` or `default_limits`. |
+
+```python
+status = limiter.get_status('api.example.com')
+if status.confidence == 'estimated':
+    # Replace the guess with the limit from the provider's docs
+    limiter.set_limit('api.example.com', limit=100, window='1m')
 ```
 
 ### Manual Rate Limit Configuration
@@ -250,7 +291,7 @@ The library automatically detects rate limits from headers for:
 
 ### RateLimiter
 
-#### `__init__(storage='memory', default_limits=None, headers_map=None, raise_on_limit=False)`
+#### `__init__(storage='memory', default_limits=None, headers_map=None, raise_on_limit=False, retry=None)`
 
 Create a new rate limiter.
 
@@ -262,6 +303,26 @@ Create a new rate limiter.
 - `default_limits` (dict): Default limits when headers aren't available. Example: `{'requests_per_minute': 60}`
 - `headers_map` (dict): Custom header name mapping
 - `raise_on_limit` (bool): If `True`, raise `RateLimitExceeded` instead of waiting
+- `retry` (RetryConfig): How to retry a request the server rejects with 429/503/504.
+  Defaults to three attempts with jittered exponential backoff.
+
+```python
+from smartratelimit.retry import RetryConfig, RetryStrategy
+
+limiter = RateLimiter(
+    retry=RetryConfig(
+        max_retries=5,
+        strategy=RetryStrategy.EXPONENTIAL,
+        max_delay=30.0,   # also caps how long a Retry-After header can park you
+        jitter=0.1,
+    )
+)
+```
+
+A `Retry-After` header on the response wins over the backoff schedule — the
+server knows when its window reopens. Both the seconds form and the HTTP-date
+form are honoured, capped at `max_delay`. `RetryStrategy.NONE` means one
+attempt, no retries.
 
 #### `request(method, url, **kwargs) -> requests.Response`
 
@@ -276,7 +337,10 @@ Make a rate-limited HTTP request.
 
 #### `wrap_session(session: requests.Session) -> None`
 
-Wrap an existing `requests.Session` with rate limiting.
+Wrap an existing `requests.Session` with rate limiting, in place. The session
+remains the transport: its headers, cookies, auth, adapters, proxies and
+connection pool are all still used — only the scheduling of the call is taken
+over. Wrapping the same session twice is a no-op.
 
 #### `get_status(endpoint: str) -> RateLimitStatus | None`
 
@@ -310,6 +374,7 @@ Status information about current rate limits.
 - `remaining` (int): Remaining requests
 - `reset_time` (datetime): When the limit resets
 - `window` (timedelta): Time window for the limit
+- `confidence` (str): `'confirmed'`, `'estimated'` or `'configured'` — see above
 - `reset_in` (float): Seconds until reset (property)
 - `is_exceeded` (bool): Whether limit is exceeded (property)
 - `utilization` (float): Utilization percentage 0.0-1.0 (property)
@@ -385,13 +450,13 @@ for item in items:
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](https://github.com/olastephen/smartratelimit/blob/main/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Contributions are welcome! Please read [CONTRIBUTING.md](https://github.com/Olaverse-Labs/smartratelimit/blob/main/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## License
 
 This project is licensed under the Apache License 2.0.
 
-See the [LICENSE](https://github.com/olastephen/smartratelimit/blob/main/LICENSE) file for the full license text.
+See the [LICENSE](https://github.com/Olaverse-Labs/smartratelimit/blob/main/LICENSE) file for the full license text.
 
 ## Documentation
 
@@ -413,8 +478,8 @@ The site is built with MkDocs from the [`docs/`](docs/) directory and deploys on
 ## Support
 
 - 📖 [Documentation](https://olaverse-labs.github.io/smartratelimit/)
-- 🐛 [Issue Tracker](https://github.com/olastephen/smartratelimit/issues)
-- 💬 [Discussions](https://github.com/olastephen/smartratelimit/discussions)
+- 🐛 [Issue Tracker](https://github.com/Olaverse-Labs/smartratelimit/issues)
+- 💬 [Discussions](https://github.com/Olaverse-Labs/smartratelimit/discussions)
 
 ## Acknowledgments
 

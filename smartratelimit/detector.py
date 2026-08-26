@@ -1,11 +1,20 @@
 """Rate limit detection from HTTP headers."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
+
+#: A rate limit read straight from the response: the server told us the limit
+#: and when it resets, so the window is a fact.
+CONFIDENCE_CONFIRMED = "confirmed"
+
+#: A rate limit where the server gave a limit but no usable reset, so the
+#: window below had to be assumed. Callers that care about correctness should
+#: treat these as a hint and configure the real limit explicitly.
+CONFIDENCE_ESTIMATED = "estimated"
 
 
 class RateLimitDetector:
@@ -62,14 +71,28 @@ class RateLimitDetector:
         },
     }
 
-    def __init__(self, custom_headers_map: Optional[Dict[str, str]] = None):
+    #: Window assumed when a response advertises a limit but no reset time.
+    #: There is no safe guess here -- a limit of 100 could be per minute or per
+    #: day -- so the assumption is surfaced via ``confidence`` rather than
+    #: passed off as detected fact.
+    DEFAULT_WINDOW = timedelta(hours=1)
+
+    def __init__(
+        self,
+        custom_headers_map: Optional[Dict[str, str]] = None,
+        default_window: Optional[timedelta] = None,
+    ):
         """
         Initialize detector with optional custom header mapping.
 
         Args:
             custom_headers_map: Custom mapping like {'limit': 'X-My-Limit', ...}
+            default_window: Window to assume when a response advertises a limit
+                but no reset time. Detections that fall back to it are marked
+                ``confidence='estimated'``. Defaults to one hour.
         """
         self.custom_headers_map = custom_headers_map or {}
+        self.default_window = default_window or self.DEFAULT_WINDOW
 
     def detect_from_response(
         self, response: requests.Response
@@ -78,8 +101,9 @@ class RateLimitDetector:
         Detect rate limit information from HTTP response.
 
         Returns:
-            Dict with keys: limit, remaining, reset_time, window
-            or None if no rate limit info found
+            Dict with keys: limit, remaining, reset_time, window, confidence
+            (``'confirmed'`` when the server supplied the window, ``'estimated'``
+            when it had to be assumed) or None if no rate limit info found
         """
         headers = response.headers
         url = response.url
@@ -122,13 +146,15 @@ class RateLimitDetector:
             retry_after = self._find_header(headers, self.HEADER_PATTERNS["retry_after"])
             if retry_after:
                 retry_seconds = self._parse_retry_after(headers[retry_after])
-                if retry_seconds:
+                if retry_seconds is not None:
                     return {
                         "limit": None,
                         "remaining": 0,
                         "reset_time": datetime.utcnow()
                         + timedelta(seconds=retry_seconds),
                         "window": timedelta(seconds=retry_seconds),
+                        # The server named the wait explicitly.
+                        "confidence": CONFIDENCE_CONFIRMED,
                     }
 
         return None
@@ -174,31 +200,32 @@ class RateLimitDetector:
         if remaining is None:
             remaining = limit
 
-        # If we have remaining but no reset time, estimate window
-        if reset_time is None and limit and remaining is not None:
-            # Default to 1 hour window if we can't determine
-            window = timedelta(hours=1)
+        if not limit:
+            return None
+
+        # The server gave a limit. Whether it also gave a usable window decides
+        # how much this detection can be trusted -- a limit of 100 with no reset
+        # header could be per minute or per day, and guessing wrong either
+        # throttles the caller for nothing or lets them sail past the real limit.
+        confidence = CONFIDENCE_CONFIRMED
+        if reset_time is None:
+            confidence = CONFIDENCE_ESTIMATED
+            window = self.default_window
             reset_time = datetime.utcnow() + window
-
-        if limit:
-            # Ensure we have a reset_time and window
-            if reset_time is None:
-                window = timedelta(hours=1)
+        elif window is None:
+            window = reset_time - datetime.utcnow()
+            if window.total_seconds() <= 0:
+                confidence = CONFIDENCE_ESTIMATED
+                window = self.default_window
                 reset_time = datetime.utcnow() + window
-            elif window is None:
-                window = reset_time - datetime.utcnow()
-                if window.total_seconds() <= 0:
-                    window = timedelta(hours=1)
-                    reset_time = datetime.utcnow() + window
 
-            return {
-                "limit": limit,
-                "remaining": remaining if remaining is not None else limit,
-                "reset_time": reset_time,
-                "window": window,
-            }
-
-        return None
+        return {
+            "limit": limit,
+            "remaining": remaining,
+            "reset_time": reset_time,
+            "window": window,
+            "confidence": confidence,
+        }
 
     def _parse_reset_time(
         self, reset_value: str, domain: str
@@ -244,23 +271,55 @@ class RateLimitDetector:
 
         return None, None
 
-    def _parse_retry_after(self, retry_after: str) -> Optional[int]:
-        """Parse Retry-After header value."""
+    def _parse_retry_after(self, retry_after: str) -> Optional[float]:
+        """
+        Parse a ``Retry-After`` value into seconds.
+
+        RFC 9110 allows either a delay in seconds or an HTTP-date, and real APIs
+        send both. A date that has already passed yields 0.0, not a negative
+        wait.
+        """
+        if retry_after is None:
+            return None
+
+        value = retry_after.strip()
+
         try:
-            # Try as seconds
-            return int(retry_after)
+            return max(0.0, float(value))
         except (ValueError, TypeError):
             pass
 
-        # Try HTTP-date format (RFC 7231)
+        # HTTP-date format (RFC 9110). parsedate_to_datetime returns an aware
+        # datetime, so compare against an aware "now" -- subtracting it from a
+        # naive utcnow() raises TypeError and silently loses the header.
         try:
             from email.utils import parsedate_to_datetime
 
-            retry_date = parsedate_to_datetime(retry_after)
-            delta = retry_date - datetime.utcnow()
-            return int(delta.total_seconds())
+            retry_date = parsedate_to_datetime(value)
         except (ValueError, TypeError):
-            pass
+            return None
 
-        return None
+        if retry_date is None:
+            return None
+
+        if retry_date.tzinfo is None:
+            retry_date = retry_date.replace(tzinfo=timezone.utc)
+
+        delta = retry_date - datetime.now(timezone.utc)
+        return max(0.0, delta.total_seconds())
+
+    def retry_after_seconds(self, headers: Dict[str, str]) -> Optional[float]:
+        """
+        Read the server's requested wait from a response's headers.
+
+        Args:
+            headers: Response headers (any case-insensitive mapping).
+
+        Returns:
+            Seconds to wait, or None if no usable ``Retry-After`` is present.
+        """
+        header = self._find_header(headers, self.HEADER_PATTERNS["retry_after"])
+        if header is None:
+            return None
+        return self._parse_retry_after(headers[header])
 

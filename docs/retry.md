@@ -55,16 +55,20 @@ RetryConfig(strategy=RetryStrategy.FIXED, base_delay=5.0, max_retries=5)
 RetryConfig(strategy=RetryStrategy.LINEAR, retry_on_status=[502, 503, 504])
 ```
 
-!!! note "No jitter"
-    Delays are deterministic. If many workers hit the same limit at the same
-    moment, they retry in lockstep. Add your own jitter when that matters —
-    `time.sleep(random.uniform(0, 1))` before the call is usually enough.
+!!! note "Jitter is opt-in"
+    Delays are deterministic unless you ask for jitter, so a configured schedule
+    stays exactly predictable. If many workers hit the same limit at the same
+    moment they would otherwise retry in lockstep and collide again — pass
+    `jitter=0.1` to spread them by up to 10% either way. `RateLimiter` and
+    `AsyncRateLimiter` default their own retries to `jitter=0.1`.
 
 ## Which statuses retry
 
 `retry_on_status` decides. The default `[429, 503, 504]` covers "you're going too fast" and "the upstream is briefly unwell". Anything else — a 400, a 404, a 500 — is returned immediately, because retrying it will not help.
 
-Note that `RetryHandler` counts a **429 response as a reason to retry**, while `RateLimiter.request()` separately honours `Retry-After` by sleeping and retrying once on its own. Stacking them is fine and usually right: the limiter handles the polite single retry, the handler handles persistence.
+`RateLimiter.request()` already retries these statuses on its own, using the same `RetryConfig` type — pass one as `RateLimiter(retry=...)` to configure it. Reach for a standalone `RetryHandler` when you need to retry something that is not a limiter request, or want a different schedule around one particular call.
+
+`RetryStrategy.NONE` means a single attempt: retrying with a zero delay would just hammer an endpoint that already said no.
 
 ## Exceptions are retried too
 

@@ -4,6 +4,58 @@ All notable changes to smartratelimit. The format follows [Keep a Changelog](htt
 
 Current release: **v{{ smartratelimit_version }}**
 
+## 0.4.0
+
+### Fixed
+
+- **Persistent backends did not rate limit at all.** `request()` consumed a
+  token from an in-memory copy of the bucket, then re-read the bucket from
+  storage before saving it — discarding the consumption. With `sqlite://` or
+  `redis://` every request found a full bucket, so the limiter never throttled
+  anything. It only appeared to work with `memory` storage, where the "copy" is
+  the same object. Consumption now happens inside the storage backend.
+- **Concurrent workers could overdraw a shared bucket.** Even with the
+  write-back fixed, `get` / modify / `set` loses updates: two workers read 10
+  tokens, both write 9, and two requests cost one token. Storage backends now
+  expose an atomic `acquire()` — `MemoryStorage` under its lock,
+  `SQLiteStorage` inside a `BEGIN IMMEDIATE` transaction, `RedisStorage` as a
+  server-side Lua script — so the "multi-process safe" claim holds for real.
+- **`Retry-After` as an HTTP-date was silently ignored.** Parsing the date form
+  raised `TypeError` comparing an aware datetime to a naive one, which was
+  caught and treated as "no header". Both forms now parse; a date already in the
+  past yields 0 rather than a negative wait.
+- **A 429 was retried at most once**, and only when `Retry-After` parsed as an
+  integer. Requests now retry per `RetryConfig`, preferring the server's
+  `Retry-After` and falling back to exponential backoff.
+- **`wrap_session()` discarded the session it was given**, routing calls through
+  the limiter's own private session and dropping the caller's headers, cookies,
+  auth, adapters, proxies and connection pool. The session is now the transport.
+- `MemoryStorage` cleanup raised `TypeError` on a stored limit with no reset
+  time.
+
+### Added
+
+- `StorageBackend.acquire()`, the atomic refill-and-consume operation the
+  limiter now relies on
+- `RateLimitStatus.confidence` — `'confirmed'`, `'estimated'` or `'configured'`
+  — so an assumed window is labelled rather than reported as a reading
+- `RateLimitDetector(default_window=...)`
+- `RateLimiter(retry=...)` and `AsyncRateLimiter(retry=...)`
+- `RetryConfig(jitter=...)`, plus `RetryHandler.delay_for_attempt()` and
+  `RetryHandler.max_attempts()`
+- Multi-process tests for SQLite and Redis that fail if one token is
+  double-spent
+
+### Changed
+
+- `RetryStrategy.NONE` now means a single attempt rather than `max_retries`
+  zero-delay retries
+- `raise_on_limit=True` raises on a retryable server rejection instead of
+  returning the failed response
+- Waiting for a token is bounded by `RateLimiter.MAX_WAIT_ATTEMPTS` (64)
+- SQLite connections use WAL and a busy timeout
+- `RedisStorage` stores bucket timestamps as Unix time; older buckets still read
+
 ## 0.3.2
 
 ### Fixed

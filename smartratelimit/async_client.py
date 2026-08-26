@@ -10,9 +10,39 @@ from requests.structures import CaseInsensitiveDict
 
 from smartratelimit.detector import RateLimitDetector
 from smartratelimit.models import RateLimit, RateLimitStatus, TokenBucket
+from smartratelimit.retry import RetryConfig
 from smartratelimit.storage import StorageBackend
 
 logger = logging.getLogger(__name__)
+
+
+class _AiohttpResponse:
+    """
+    An already-read aiohttp response that outlives its connection.
+
+    aiohttp releases the connection when the ``async with`` block exits, which
+    makes the body unreadable afterwards. Capturing it here lets the limiter
+    retry inside the loop and still hand callers a response they can read.
+    """
+
+    def __init__(self, response, body):
+        self._response = response
+        self._body = body
+        self.url = str(response.url)
+        self.status_code = response.status
+        self.status = response.status
+        self.headers = response.headers
+
+    async def read(self):
+        return self._body
+
+    async def json(self):
+        import json
+
+        return json.loads(self._body.decode())
+
+    async def text(self):
+        return self._body.decode()
 
 
 class AsyncRateLimiter:
@@ -32,6 +62,7 @@ class AsyncRateLimiter:
         default_limits: Optional[Dict[str, int]] = None,
         headers_map: Optional[Dict[str, str]] = None,
         raise_on_limit: bool = False,
+        retry: Optional[RetryConfig] = None,
     ):
         """
         Initialize async rate limiter.
@@ -41,6 +72,8 @@ class AsyncRateLimiter:
             default_limits: Default limits like {'requests_per_second': 10}
             headers_map: Custom header name mapping
             raise_on_limit: If True, raise exception instead of waiting
+            retry: How to retry a request the server rejects with 429/503/504.
+                Defaults to three attempts with jittered exponential backoff.
         """
         from smartratelimit.core import RateLimiter
 
@@ -50,11 +83,13 @@ class AsyncRateLimiter:
             default_limits=default_limits,
             headers_map=headers_map,
             raise_on_limit=raise_on_limit,
+            retry=retry,
         )
         self._storage = sync_limiter._storage
         self._detector = sync_limiter._detector
         self._default_limits = sync_limiter._default_limits
         self._raise_on_limit = sync_limiter._raise_on_limit
+        self._retry = sync_limiter._retry
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -75,10 +110,78 @@ class AsyncRateLimiter:
         endpoint = self._get_endpoint_key(url)
         return f"{endpoint}:{limit_type}"
 
+    async def _acquire(self, url: str, limit: int, window: timedelta) -> None:
+        """
+        Await a token for ``url``, or raise.
+
+        Mirrors :meth:`RateLimiter._acquire`: consumption happens atomically
+        inside the storage backend, so concurrent tasks, processes and hosts
+        share one honest count.
+        """
+        from smartratelimit.core import RateLimiter, RateLimitExceeded
+
+        window_seconds = window.total_seconds() if window else 0.0
+        if limit <= 0 or window_seconds <= 0:
+            return
+
+        capacity = float(limit)
+        refill_rate = capacity / window_seconds
+        key = self._get_bucket_key(url)
+
+        loop = asyncio.get_running_loop()
+
+        for _ in range(RateLimiter.MAX_WAIT_ATTEMPTS):
+            # The storage backends are synchronous, and an atomic acquire can
+            # block for as long as it takes another process to release the
+            # SQLite write lock or Redis to run the script. Off the event loop
+            # it goes, so one worker's contention does not stall every other
+            # coroutine in the process.
+            allowed, wait_time = await loop.run_in_executor(
+                None, self._storage.acquire, key, capacity, refill_rate
+            )
+            if allowed:
+                return
+
+            if self._raise_on_limit:
+                raise RateLimitExceeded(
+                    f"Rate limit exceeded for {url}. Wait {wait_time:.2f} seconds."
+                )
+
+            if wait_time == float("inf"):
+                raise RateLimitExceeded(
+                    f"Rate limit for {url} can never be satisfied: "
+                    f"the bucket does not refill."
+                )
+
+            logger.info(
+                f"Rate limit reached for {url}, waiting {wait_time:.2f} seconds"
+            )
+            await asyncio.sleep(max(wait_time, 0.001))
+
+        raise RateLimitExceeded(
+            f"Could not acquire a token for {url} after "
+            f"{RateLimiter.MAX_WAIT_ATTEMPTS} attempts; the endpoint is saturated."
+        )
+
+    def _retry_delay(self, response, attempt: int) -> float:
+        """Seconds to wait before retrying a rejected request."""
+        retry_after = self._detector.retry_after_seconds(
+            CaseInsensitiveDict(response.headers)
+        )
+        if retry_after is not None:
+            return min(retry_after, self._retry.config.max_delay)
+
+        return self._retry.delay_for_attempt(attempt)
+
     def _get_or_create_bucket(
         self, url: str, limit: int, window: timedelta
     ) -> TokenBucket:
-        """Get or create token bucket for URL."""
+        """
+        Get or create the token bucket for URL.
+
+        Deprecated for request accounting: the returned bucket is a snapshot.
+        Use :meth:`_acquire`. Kept for inspecting bucket state.
+        """
         key = self._get_bucket_key(url)
         bucket = self._storage.get_token_bucket(key)
 
@@ -100,7 +203,12 @@ class AsyncRateLimiter:
         return bucket
 
     async def _wait_for_token(self, bucket: TokenBucket, url: str) -> None:
-        """Wait until token is available (async)."""
+        """
+        Wait until a token is available in a caller-held bucket.
+
+        Deprecated: operates on an in-memory snapshot, so the consumption is
+        invisible to other workers. :meth:`_acquire` is the safe path.
+        """
         wait_time = bucket.wait_time()
         if wait_time > 0:
             if self._raise_on_limit:
@@ -157,13 +265,19 @@ class AsyncRateLimiter:
                 remaining=remaining or limit,
                 reset_time=reset_time,
                 window=window,
+                confidence=detected.get("confidence", "confirmed"),
             )
             self._storage.set_rate_limit(endpoint, rate_limit)
 
-            bucket = self._get_or_create_bucket(endpoint, limit, window)
+            # Write the server-corrected count back, or persistent backends
+            # never see it.
             if remaining is not None:
+                bucket = self._get_or_create_bucket(endpoint, limit, window)
                 bucket.tokens = min(bucket.capacity, float(remaining))
                 bucket.last_update = datetime.utcnow()
+                self._storage.set_token_bucket(
+                    self._get_bucket_key(endpoint), bucket
+                )
 
             logger.debug(
                 f"Rate limit updated for {endpoint}: {remaining}/{limit} remaining"
@@ -196,6 +310,7 @@ class AsyncRateLimiter:
             remaining=limit,
             reset_time=datetime.utcnow() + window,
             window=window,
+            confidence="configured",
         )
         self._storage.set_rate_limit(endpoint, rate_limit)
 
@@ -214,48 +329,43 @@ class AsyncRateLimiter:
         Returns:
             httpx.Response object
         """
+        from smartratelimit.core import RateLimitExceeded
+
         endpoint = self._get_endpoint_key(url)
-        self._apply_default_limits(url)
+        max_attempts = self._retry.max_attempts()
 
-        rate_limit = self._storage.get_rate_limit(endpoint)
-
-        if rate_limit:
-            bucket = self._get_or_create_bucket(
-                endpoint, rate_limit.limit, rate_limit.window
-            )
-            await self._wait_for_token(bucket, url)
-        elif self._default_limits:
+        for attempt in range(1, max_attempts + 1):
             self._apply_default_limits(url)
+
             rate_limit = self._storage.get_rate_limit(endpoint)
-            if rate_limit:
-                bucket = self._get_or_create_bucket(
-                    endpoint, rate_limit.limit, rate_limit.window
+            if rate_limit and rate_limit.limit:
+                await self._acquire(endpoint, rate_limit.limit, rate_limit.window)
+
+            response = await client.request(method, url, **kwargs)
+            self._update_from_response(response)
+
+            if response.status_code not in self._retry.config.retry_on_status:
+                return response
+
+            if attempt >= max_attempts:
+                logger.warning(
+                    f"Giving up on {url} after {attempt} attempts "
+                    f"(last status {response.status_code})"
                 )
-                await self._wait_for_token(bucket, url)
+                return response
 
-        response = await client.request(method, url, **kwargs)
-        self._update_from_response(response)
+            wait_time = self._retry_delay(response, attempt)
+            if self._raise_on_limit:
+                raise RateLimitExceeded(
+                    f"{url} returned {response.status_code}. "
+                    f"Retry after {wait_time:.2f} seconds."
+                )
 
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    wait_time = int(retry_after)
-                    logger.warning(
-                        f"Received 429 for {url}, waiting {wait_time} seconds"
-                    )
-                    if not self._raise_on_limit:
-                        await asyncio.sleep(wait_time)
-                        response = await client.request(method, url, **kwargs)
-                        self._update_from_response(response)
-                except (ValueError, TypeError):
-                    pass
-
-        if rate_limit:
-            bucket = self._get_or_create_bucket(
-                endpoint, rate_limit.limit, rate_limit.window
+            logger.warning(
+                f"Received {response.status_code} for {url}, "
+                f"waiting {wait_time:.2f} seconds before attempt {attempt + 1}"
             )
-            self._storage.set_token_bucket(self._get_bucket_key(endpoint), bucket)
+            await asyncio.sleep(wait_time)
 
         return response
 
@@ -274,82 +384,50 @@ class AsyncRateLimiter:
         Returns:
             aiohttp.ClientResponse object
         """
+        from smartratelimit.core import RateLimitExceeded
+
         endpoint = self._get_endpoint_key(url)
-        self._apply_default_limits(url)
+        max_attempts = self._retry.max_attempts()
 
-        rate_limit = self._storage.get_rate_limit(endpoint)
-
-        if rate_limit:
-            bucket = self._get_or_create_bucket(
-                endpoint, rate_limit.limit, rate_limit.window
-            )
-            await self._wait_for_token(bucket, url)
-        elif self._default_limits:
+        for attempt in range(1, max_attempts + 1):
             self._apply_default_limits(url)
+
             rate_limit = self._storage.get_rate_limit(endpoint)
-            if rate_limit:
-                bucket = self._get_or_create_bucket(
-                    endpoint, rate_limit.limit, rate_limit.window
+            if rate_limit and rate_limit.limit:
+                await self._acquire(endpoint, rate_limit.limit, rate_limit.window)
+
+            async with session.request(method, url, **kwargs) as response:
+                # The body has to be read before the connection is released,
+                # so every attempt -- retried or not -- comes back wrapped and
+                # readable.
+                body = await response.read()
+                self._update_from_response(response)
+                wrapped = _AiohttpResponse(response, body)
+
+            if wrapped.status_code not in self._retry.config.retry_on_status:
+                return wrapped
+
+            if attempt >= max_attempts:
+                logger.warning(
+                    f"Giving up on {url} after {attempt} attempts "
+                    f"(last status {wrapped.status_code})"
                 )
-                await self._wait_for_token(bucket, url)
+                return wrapped
 
-        async with session.request(method, url, **kwargs) as response:
-            # Read response body before updating
-            body = await response.read()
-            self._update_from_response(response)
-
-            if response.status == 429:
-                retry_after = response.headers.get("Retry-After")
-                if retry_after:
-                    try:
-                        wait_time = int(retry_after)
-                        logger.warning(
-                            f"Received 429 for {url}, waiting {wait_time} seconds"
-                        )
-                        if not self._raise_on_limit:
-                            await asyncio.sleep(wait_time)
-                            async with session.request(method, url, **kwargs) as retry_response:
-                                body = await retry_response.read()
-                                self._update_from_response(retry_response)
-                                # Fall through so the retried response is wrapped
-                                # like every other one. Returning the raw
-                                # ClientResponse here handed callers an object
-                                # with no .status_code and a spent body, so code
-                                # that worked on the normal path broke the moment
-                                # a 429 was retried.
-                                response = retry_response
-                    except (ValueError, TypeError):
-                        pass
-
-            if rate_limit:
-                bucket = self._get_or_create_bucket(
-                    endpoint, rate_limit.limit, rate_limit.window
-                )
-                self._storage.set_token_bucket(
-                    self._get_bucket_key(endpoint), bucket
+            wait_time = self._retry_delay(wrapped, attempt)
+            if self._raise_on_limit:
+                raise RateLimitExceeded(
+                    f"{url} returned {wrapped.status_code}. "
+                    f"Retry after {wait_time:.2f} seconds."
                 )
 
-            # Create a response-like object that preserves the body
-            class ResponseWrapper:
-                def __init__(self, response, body):
-                    self._response = response
-                    self._body = body
-                    self.url = str(response.url)
-                    self.status_code = response.status
-                    self.status = response.status
-                    self.headers = response.headers
+            logger.warning(
+                f"Received {wrapped.status_code} for {url}, "
+                f"waiting {wait_time:.2f} seconds before attempt {attempt + 1}"
+            )
+            await asyncio.sleep(wait_time)
 
-                async def read(self):
-                    return self._body
-
-                async def json(self):
-                    import json
-                    return json.loads(self._body.decode())
-
-                async def text(self):
-                    return self._body.decode()
-
-            return ResponseWrapper(response, body)
+        return wrapped
 
     def get_status(self, endpoint: str) -> Optional[RateLimitStatus]:
         """Get current rate limit status for an endpoint."""

@@ -32,6 +32,13 @@ def cmd_status(args):
             if status.reset_in:
                 print(f"  Resets in: {status.reset_in:.0f} seconds")
             print(f"  Exceeded: {status.is_exceeded}")
+            print(f"  Confidence: {status.confidence}")
+            if status.confidence == "estimated":
+                print(
+                    "  Note: the API reported a limit but no reset time, so the "
+                    "window above was assumed.\n"
+                    "        Set the real one with RateLimiter.set_limit()."
+                )
         else:
             print(f"\nEndpoint: {endpoint}")
             print("  No rate limit information available")
@@ -78,6 +85,12 @@ def cmd_probe(args):
             print(f"  Limit: {status.limit}")
             print(f"  Remaining: {status.remaining}")
             print(f"  Window: {status.window}")
+            print(f"  Confidence: {status.confidence}")
+            if status.confidence == "estimated":
+                print(
+                    "  Note: no usable reset header, so the window above is an "
+                    "assumption, not a reading."
+                )
         else:
             print("\nNo rate limit information detected in headers")
 

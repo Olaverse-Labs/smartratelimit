@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-26
+
+### Fixed
+- **Persistent backends did not rate limit at all.** `request()` consumed a token
+  from an in-memory copy of the bucket, then re-read the bucket from storage
+  before saving it — discarding the consumption. With `sqlite://` or `redis://`
+  every request found a full bucket, so the limiter never throttled anything. It
+  only appeared to work with `memory` storage, where the "copy" is the same
+  object. Consumption now happens inside the storage backend.
+- **Concurrent workers could overdraw a shared bucket.** Even with the write-back
+  fixed, `get` / modify / `set` loses updates: two workers read 10 tokens, both
+  write 9, and two requests cost one token. Storage backends now expose an
+  atomic `acquire()` — `MemoryStorage` under its lock, `SQLiteStorage` inside a
+  `BEGIN IMMEDIATE` transaction, `RedisStorage` as a server-side Lua script — so
+  the "multi-process safe" claim holds for real. Covered by multi-process tests
+  that fail if a single token is double-spent.
+- **`Retry-After` as an HTTP-date was silently ignored.** RFC 9110 allows either
+  a delay in seconds or a date, and real APIs send both. Parsing the date form
+  raised `TypeError` comparing an aware datetime to a naive one, which was
+  caught and treated as "no header", so the server's own timing was thrown away.
+  Both forms now parse; a date already in the past yields 0 rather than a
+  negative wait.
+- **A 429 was retried at most once.** The retry path also only ran when
+  `Retry-After` parsed as an integer, so a 429 with no header — or a date — was
+  returned to the caller unretried. Requests now retry per `RetryConfig`,
+  preferring the server's `Retry-After` and falling back to exponential backoff.
+- **`wrap_session()` discarded the session it was given.** It replaced
+  `session.request` with a call routed through the limiter's own private
+  session, so the caller's headers, cookies, auth, adapters, proxies and
+  connection pool were all dropped — the wrapped session was wrapped in name
+  only. The session is now the transport; wrapping twice is a no-op.
+- `MemoryStorage` cleanup raised `TypeError` on a stored limit with no reset
+  time, which could surface during an unrelated read or write.
+- README links pointed at a repository path that no longer exists.
+
+### Added
+- `StorageBackend.acquire(key, capacity, refill_rate, tokens=1.0)` — the atomic
+  refill-and-consume operation the limiter now relies on. Custom backends must
+  implement it.
+- `RateLimitStatus.confidence` / `RateLimit.confidence`, one of `'confirmed'`
+  (the API reported its window), `'estimated'` (a limit with no usable reset, so
+  the window was assumed) or `'configured'` (set by you). A limit of 100 with no
+  reset header could be per minute or per day; the assumption is now labelled
+  instead of being reported as a reading. Surfaced by `smartratelimit status`
+  and `smartratelimit probe`.
+- `RateLimitDetector(default_window=...)` to control the window assumed for
+  `'estimated'` detections.
+- `RateLimiter(retry=RetryConfig(...))` and `AsyncRateLimiter(retry=...)` to
+  configure request retries.
+- `RetryConfig(jitter=...)` to spread retries out, so clients throttled by the
+  same window do not all wake and collide again. Defaults to `0.0`; the
+  limiters default to `0.1`.
+- `RetryHandler.delay_for_attempt()` and `RetryHandler.max_attempts()`.
+
+### Changed
+- `RetryStrategy.NONE` now means a single attempt. Previously it still retried
+  `max_retries` times with a zero delay, hammering an endpoint that had already
+  said no.
+- With `raise_on_limit=True`, a retryable server rejection (429/503/504) now
+  raises `RateLimitExceeded` instead of returning the failed response, matching
+  the flag's meaning of "raise rather than wait".
+- Waiting for a token is bounded by `RateLimiter.MAX_WAIT_ATTEMPTS` (64).
+  Reaching it raises `RateLimitExceeded` rather than waiting forever for an
+  endpoint that other workers keep winning.
+- SQLite connections now use WAL and a busy timeout, so concurrent limiters
+  queue for the write lock instead of failing with "database is locked".
+- `RedisStorage` stores bucket timestamps as Unix time (the Lua script cannot
+  format ISO strings). Buckets written by earlier versions are still read.
+
 ## [0.3.2] - 2026-08-15
 
 ### Fixed

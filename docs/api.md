@@ -31,6 +31,7 @@ Synchronous limiter built on `requests`.
 | `default_limits` | `dict \| None` | `None` | Fallback limit when nothing is detected — one of `requests_per_second`, `requests_per_minute`, `requests_per_hour` |
 | `headers_map` | `dict \| None` | `None` | Custom header names: keys `limit`, `remaining`, `reset` |
 | `raise_on_limit` | `bool` | `False` | Raise `RateLimitExceeded` instead of waiting |
+| `retry` | `RetryConfig \| None` | `None` | How to retry a 429/503/504. Defaults to three attempts with jittered exponential backoff |
 
 Raises `ValueError` for an unrecognised storage string. A SQLite or Redis backend that fails to initialise logs a warning and falls back to memory.
 
@@ -40,13 +41,15 @@ If `default_limits` contains more than one key, the shortest window present wins
 
 Make a paced request. `**kwargs` are passed through to `requests.request()`.
 
-Waits (or raises, with `raise_on_limit=True`) when the endpoint's bucket is empty, then updates the stored quota from the response headers. On a 429 carrying `Retry-After`, sleeps and retries **once** unless `raise_on_limit=True`.
+Waits (or raises, with `raise_on_limit=True`) when the endpoint's bucket is empty, then updates the stored quota from the response headers.
+
+A 429, 503 or 504 is retried per the `retry` config. `Retry-After` decides the wait when present — seconds or HTTP-date, capped at `max_delay` — otherwise exponential backoff with jitter applies. When the attempts run out the last response is returned as-is. With `raise_on_limit=True` a retryable rejection raises `RateLimitExceeded` instead of being waited out.
 
 ### `.wrap_session(session) -> None`
 
 Replace `session.request` with a paced version, in place. Returns `None`.
 
-The wrapped calls are issued through the limiter's own internal session, so headers, auth and cookies configured on your session are **not** applied — pass them per call instead.
+Your session stays the transport: its headers, cookies, auth, adapters, proxies and connection pool all continue to apply. Only the scheduling of the call is taken over. Wrapping the same session twice is a no-op.
 
 ### `.get_status(endpoint) -> RateLimitStatus | None`
 

@@ -72,6 +72,10 @@ The stored quota and bucket live behind a small interface with three implementat
 | `sqlite:///file.db` | yes | yes, same machine | no |
 | `redis://host:port/0` | yes | yes | yes |
 
+Tokens are consumed **inside** the store as one atomic step — under the lock for
+memory, in a `BEGIN IMMEDIATE` transaction for SQLite, in a Lua script for Redis
+— so no two workers can spend the same token.
+
 See [Which storage backend?](choosing.md) and [Storage Backends](storage.md).
 
 !!! note "Backends fail soft"
@@ -89,9 +93,15 @@ See [Which storage backend?](choosing.md) and [Storage Backends](storage.md).
 
 Even with pacing you can still be handed a 429 — another client on the same key, a limit the API never advertised, a burst that started before the first response taught the limiter anything.
 
-When `request()` sees a 429 with a `Retry-After` header, it sleeps for that long and **retries the request once**. If the retry also fails, the response is returned as-is for you to handle. For anything more determined than one retry, wrap the call in a [`RetryHandler`](retry.md).
+When `request()` sees a 429 (or a 503 or 504), it retries according to its `RetryConfig` — three attempts by default. A `Retry-After` header decides the wait, since the server knows when its window reopens; both the seconds form and the HTTP-date form are honoured, capped at `max_delay`. Without that header the limiter falls back to exponential backoff with jitter. If the last attempt still fails, the response is returned as-is for you to handle.
 
-Set `raise_on_limit=True` and the limiter never sleeps: it raises `RateLimitExceeded` when the bucket is empty, and returns 429 responses untouched. That's the right mode for a request handler where a slow response is worse than an error.
+```python
+from smartratelimit.retry import RetryConfig
+
+limiter = RateLimiter(retry=RetryConfig(max_retries=5, max_delay=30.0))
+```
+
+Set `raise_on_limit=True` and the limiter never sleeps: it raises `RateLimitExceeded` when the bucket is empty, and raises rather than waiting out a retryable rejection. That's the right mode for a request handler where a slow response is worse than an error.
 
 ```python
 from smartratelimit import RateLimiter, RateLimitExceeded
