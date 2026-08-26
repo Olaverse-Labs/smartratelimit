@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from smartratelimit._time import utcnow
 from smartratelimit.models import RateLimitStatus
 
 
@@ -50,7 +51,7 @@ class MetricsCollector:
         if rate_limit_status:
             metrics["rate_limit_history"].append(
                 {
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": utcnow().isoformat(),
                     "limit": rate_limit_status.limit,
                     "remaining": rate_limit_status.remaining,
                     "utilization": rate_limit_status.utilization,

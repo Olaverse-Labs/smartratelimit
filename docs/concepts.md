@@ -76,18 +76,40 @@ Tokens are consumed **inside** the store as one atomic step — under the lock f
 memory, in a `BEGIN IMMEDIATE` transaction for SQLite, in a Lua script for Redis
 — so no two workers can spend the same token.
 
+## 5. Scopes
+
+A limit belongs to an **endpoint scope**: a host, optionally narrowed by a path
+prefix. `https://api.example.com` covers the whole host;
+`https://api.example.com/search` covers only paths under `/search`.
+
+Resolving a request walks from the most specific scope to the least —
+`/v1/users/42`, then `/v1/users`, then `/v1`, then the bare host — and uses the
+first one with a stored limit. That is what lets a host-wide default and a
+narrow override coexist without either knowing about the other, and it gives
+each scope its own token bucket, so exhausting `/search` leaves `/users` alone.
+
+Query strings and trailing slashes are dropped when matching: they identify a
+request, not a quota. Detected limits attach to whichever scope is governing the
+URL, but never overwrite one you set yourself — a `confidence="configured"`
+entry stands, because you set it precisely when the headers could not be
+trusted.
+
 See [Which storage backend?](choosing.md) and [Storage Backends](storage.md).
 
-!!! note "Backends fail soft"
-    If SQLite can't open its file or Redis can't be reached at construction
-    time, the limiter logs a warning and falls back to memory rather than
-    raising. Your job keeps running — with per-process limits instead of shared
-    ones. If shared state is load-bearing for you, assert it at startup:
+!!! note "Failing open is the default, not the only option"
+    An unreachable Redis fails *open*: the request goes out unpaced and a
+    warning is logged, so a limiter outage does not take your job down with it.
+    When the limit guards a paid quota that trade is wrong — pass
+    `fail_closed=True` and the limiter raises `StorageUnavailable` (a subclass
+    of `RateLimitExceeded`) instead of waving traffic through.
 
     ```python
-    from smartratelimit.storage import RedisStorage
-    RedisStorage("redis://localhost:6379/0").redis_client.ping()
+    limiter = RateLimiter(storage="redis://localhost:6379/0", fail_closed=True)
     ```
+
+    Either way it is logged. Redis is pinged at construction, because
+    `redis-py` connects lazily and an unchecked client looks healthy right up
+    until it silently stops limiting.
 
 ## What happens on a 429
 

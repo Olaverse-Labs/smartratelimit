@@ -6,6 +6,9 @@ from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
+from requests.structures import CaseInsensitiveDict
+
+from smartratelimit._time import utcfromtimestamp, utcnow
 
 #: A rate limit read straight from the response: the server told us the limit
 #: and when it resets, so the window is a fact.
@@ -98,15 +101,42 @@ class RateLimitDetector:
         self, response: requests.Response
     ) -> Optional[Dict[str, any]]:
         """
-        Detect rate limit information from HTTP response.
+        Detect rate limit information from an HTTP response object.
 
         Returns:
             Dict with keys: limit, remaining, reset_time, window, confidence
             (``'confirmed'`` when the server supplied the window, ``'estimated'``
             when it had to be assumed) or None if no rate limit info found
         """
-        headers = response.headers
-        url = response.url
+        return self.detect(
+            response.url,
+            getattr(response, "status_code", getattr(response, "status", 200)),
+            response.headers,
+        )
+
+    def detect(
+        self, url: str, status_code: int, headers
+    ) -> Optional[Dict[str, any]]:
+        """
+        Detect rate limit information from a url, status and headers.
+
+        Takes the three pieces rather than a response object so `requests`,
+        httpx and aiohttp responses all reach identical logic -- the async
+        client used to adapt its responses separately, and a header-casing fix
+        landed on one path and not the other.
+
+        Args:
+            url: The request URL, used to pick API-specific header profiles.
+            status_code: HTTP status; 429 unlocks the ``Retry-After`` fallback.
+            headers: Response headers. Pass a case-insensitive mapping --
+                httpx lowercases names and HTTP/2 requires lowercase on the
+                wire, so a plain dict makes every lookup miss.
+
+        Returns:
+            Dict with keys: limit, remaining, reset_time, window, confidence,
+            or None if no rate limit info found.
+        """
+        headers = self._as_case_insensitive(headers)
 
         # Get domain for API-specific patterns
         domain = urlparse(url).netloc.lower()
@@ -142,7 +172,7 @@ class RateLimitDetector:
                 break
 
         # Try to extract from Retry-After on 429
-        if response.status_code == 429:
+        if status_code == 429:
             retry_after = self._find_header(headers, self.HEADER_PATTERNS["retry_after"])
             if retry_after:
                 retry_seconds = self._parse_retry_after(headers[retry_after])
@@ -150,7 +180,7 @@ class RateLimitDetector:
                     return {
                         "limit": None,
                         "remaining": 0,
-                        "reset_time": datetime.utcnow()
+                        "reset_time": utcnow()
                         + timedelta(seconds=retry_seconds),
                         "window": timedelta(seconds=retry_seconds),
                         # The server named the wait explicitly.
@@ -158,6 +188,15 @@ class RateLimitDetector:
                     }
 
         return None
+
+    @staticmethod
+    def _as_case_insensitive(headers):
+        """Wrap headers so lookups match regardless of the casing on the wire."""
+        if headers is None:
+            return CaseInsensitiveDict()
+        if isinstance(headers, CaseInsensitiveDict):
+            return headers
+        return CaseInsensitiveDict(dict(headers))
 
     def _find_header(self, headers: Dict[str, str], candidates: list) -> Optional[str]:
         """Find first matching header from candidates."""
@@ -211,13 +250,13 @@ class RateLimitDetector:
         if reset_time is None:
             confidence = CONFIDENCE_ESTIMATED
             window = self.default_window
-            reset_time = datetime.utcnow() + window
+            reset_time = utcnow() + window
         elif window is None:
-            window = reset_time - datetime.utcnow()
+            window = reset_time - utcnow()
             if window.total_seconds() <= 0:
                 confidence = CONFIDENCE_ESTIMATED
                 window = self.default_window
-                reset_time = datetime.utcnow() + window
+                reset_time = utcnow() + window
 
         return {
             "limit": limit,
@@ -236,7 +275,7 @@ class RateLimitDetector:
             # Unix timestamps are typically > 1000000000 (year 2001+)
             seconds = int(reset_value)
             if seconds < 86400:  # Less than 1 day, treat as relative seconds
-                reset_time = datetime.utcnow() + timedelta(seconds=seconds)
+                reset_time = utcnow() + timedelta(seconds=seconds)
                 return reset_time, timedelta(seconds=seconds)
         except (ValueError, TypeError):
             pass
@@ -245,8 +284,8 @@ class RateLimitDetector:
             # Try Unix timestamp (seconds) - for larger values
             timestamp = float(reset_value)
             if timestamp > 1000000000:  # Likely a Unix timestamp
-                reset_time = datetime.utcfromtimestamp(timestamp)
-                window = reset_time - datetime.utcnow()
+                reset_time = utcfromtimestamp(timestamp)
+                window = reset_time - utcnow()
                 if window.total_seconds() > 0:  # Valid future time
                     return reset_time, window
         except (ValueError, TypeError, OSError):
@@ -255,7 +294,7 @@ class RateLimitDetector:
         try:
             # Try ISO 8601 format
             reset_time = datetime.fromisoformat(reset_value.replace("Z", "+00:00"))
-            window = reset_time - datetime.utcnow()
+            window = reset_time - utcnow()
             if window.total_seconds() > 0:  # Valid future time
                 return reset_time, window
         except (ValueError, TypeError):
@@ -264,7 +303,7 @@ class RateLimitDetector:
         # Fallback: try as relative seconds
         try:
             seconds = int(reset_value)
-            reset_time = datetime.utcnow() + timedelta(seconds=seconds)
+            reset_time = utcnow() + timedelta(seconds=seconds)
             return reset_time, timedelta(seconds=seconds)
         except (ValueError, TypeError):
             pass

@@ -1,0 +1,137 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A newer push supersedes an in-flight run on the same ref.
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # One version failing should not hide the state of the others.
+      fail-fast: false
+      matrix:
+        include:
+          # 3.8 has no CPython build published for ubuntu-24.04, which is what
+          # ubuntu-latest now resolves to. It stays supported in pyproject.toml,
+          # so it is tested on the last runner that can install it.
+          - {python: "3.8", os: ubuntu-22.04}
+          - {python: "3.9", os: ubuntu-latest}
+          - {python: "3.10", os: ubuntu-latest}
+          - {python: "3.11", os: ubuntu-latest}
+          - {python: "3.12", os: ubuntu-latest}
+          - {python: "3.13", os: ubuntu-latest}
+
+    services:
+      # Without a real Redis the distributed tests skip themselves, and the
+      # backend most in need of coverage would be the one never exercised.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+          pip install pytest pytest-asyncio
+
+      - name: Run tests
+        # -m "not network" drops the one test that calls a live third-party
+        # service; a build must not go red because httpbin.org is down.
+        #
+        # The Redis tests skip themselves when Redis is missing, so a broken
+        # service container would look like a green build with the distributed
+        # limiter silently untested -- exactly the gap that let a total limiting
+        # failure reach PyPI. Treat that skip as a failure.
+        run: |
+          set -o pipefail
+          pytest -v -rs -m "not network" --durations=10 | tee /tmp/pytest.log
+          if grep -q "Redis not available" /tmp/pytest.log; then
+            echo "::error::Redis tests were skipped; the distributed limiter went untested."
+            exit 1
+          fi
+        env:
+          REDIS_URL: redis://localhost:6379/0
+
+  package:
+    name: Build and check the distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: Check metadata
+        # Catches the README failing to render on PyPI and other metadata
+        # problems that are only visible after a release otherwise.
+        run: twine check dist/*
+
+      - name: Confirm the package version matches __version__
+        run: |
+          python - <<'PY'
+          import pathlib, re, tomllib
+
+          pkg = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          init = pathlib.Path("smartratelimit/__init__.py").read_text()
+          match = re.search(r'__version__\s*=\s*"([^"]+)"', init)
+          assert match, "__version__ not found in smartratelimit/__init__.py"
+          if match.group(1) != pkg:
+              raise SystemExit(
+                  f"__version__ is {match.group(1)} but pyproject.toml says {pkg}"
+              )
+          print(f"Version {pkg} is consistent.")
+          PY
+
+  docs:
+    name: Docs build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install docs dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[docs]"
+
+      - name: Build strictly
+        # The deploy workflow only runs on main, so without this a docs change
+        # is not validated until after it has merged.
+        run: mkdocs build --strict --site-dir /tmp/site

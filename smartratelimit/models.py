@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
+from smartratelimit._time import utcnow
 
 
 @dataclass
@@ -30,7 +31,7 @@ class RateLimitStatus:
         """Get seconds until rate limit resets."""
         if self.reset_time is None:
             return None
-        delta = self.reset_time - datetime.utcnow()
+        delta = self.reset_time - utcnow()
         return max(0, delta.total_seconds())
 
     @property
@@ -82,7 +83,7 @@ class TokenBucket:
     def refill(self, now: Optional[datetime] = None) -> None:
         """Refill tokens based on elapsed time."""
         if now is None:
-            now = datetime.utcnow()
+            now = utcnow()
 
         elapsed = (now - self.last_update).total_seconds()
         if elapsed <= 0:
@@ -103,7 +104,7 @@ class TokenBucket:
     def wait_time(self, tokens: float = 1.0, now: Optional[datetime] = None) -> float:
         """Calculate how long to wait before tokens are available."""
         if now is None:
-            now = datetime.utcnow()
+            now = utcnow()
 
         self.refill(now)
         if self.tokens >= tokens:
@@ -118,5 +119,5 @@ class TokenBucket:
     def reset(self) -> None:
         """Reset bucket to full capacity."""
         self.tokens = self.capacity
-        self.last_update = datetime.utcnow()
+        self.last_update = utcnow()
 

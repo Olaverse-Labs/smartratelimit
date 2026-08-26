@@ -6,7 +6,7 @@ across multiple processes and application restarts.
 """
 
 from smartratelimit.async_client import AsyncRateLimiter
-from smartratelimit.core import RateLimiter, RateLimitExceeded
+from smartratelimit.core import RateLimiter, RateLimitExceeded, StorageUnavailable
 from smartratelimit.metrics import MetricsCollector
 from smartratelimit.models import RateLimitStatus
 from smartratelimit.retry import RetryConfig, RetryHandler, RetryStrategy
@@ -17,6 +17,7 @@ __all__ = [
     "AsyncRateLimiter",
     "RateLimitStatus",
     "RateLimitExceeded",
+    "StorageUnavailable",
     "RetryConfig",
     "RetryHandler",
     "RetryStrategy",

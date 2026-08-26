@@ -193,8 +193,14 @@ class TestCLIReal:
             if os.path.exists(db_path):
                 os.unlink(db_path)
 
+    @pytest.mark.network
     def test_cli_probe(self):
-        """Test CLI probe command with real API."""
+        """Test CLI probe command against a live endpoint.
+
+        Marked ``network``: it calls httpbin.org, whose availability is not this
+        project's to guarantee. CI deselects it so a third party being down
+        cannot turn the build red.
+        """
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
 

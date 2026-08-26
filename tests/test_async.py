@@ -184,27 +184,37 @@ class TestAsyncRateLimiter:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_wait_for_token(self):
-        """Test async token waiting."""
-        from smartratelimit.models import TokenBucket
+    async def test_acquire_waits_when_the_bucket_is_empty(self):
+        """An exhausted bucket makes the next acquire wait for a refill."""
+        from datetime import timedelta
 
         limiter = AsyncRateLimiter()
-        bucket = TokenBucket(capacity=1.0, tokens=0.0, refill_rate=1.0)
+        scope = "https://api.example.com"
+
+        # One per minute: the first token is free, the second is 60s away.
+        await limiter._acquire(scope, 1, timedelta(minutes=1))
 
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            await limiter._wait_for_token(bucket, "https://api.example.com/test")
+            with pytest.raises(RateLimitExceeded):
+                # Sleeping is faked, so no time passes and the token never
+                # arrives; the limiter gives up rather than spinning forever.
+                await limiter._acquire(scope, 1, timedelta(minutes=1))
+
             assert mock_sleep.called
+            assert mock_sleep.call_args[0][0] == pytest.approx(60, abs=1)
 
     @pytest.mark.asyncio
-    async def test_wait_for_token_raise_on_limit(self):
-        """Test async token waiting with raise_on_limit."""
-        from smartratelimit.models import TokenBucket
+    async def test_acquire_raise_on_limit(self):
+        """With raise_on_limit the first refusal raises instead of waiting."""
+        from datetime import timedelta
 
         limiter = AsyncRateLimiter(raise_on_limit=True)
-        bucket = TokenBucket(capacity=1.0, tokens=0.0, refill_rate=1.0)
+        scope = "https://api.example.com"
+
+        await limiter._acquire(scope, 1, timedelta(minutes=1))
 
         with pytest.raises(RateLimitExceeded):
-            await limiter._wait_for_token(bucket, "https://api.example.com/test")
+            await limiter._acquire(scope, 1, timedelta(minutes=1))
 
 
     @pytest.mark.asyncio

@@ -10,15 +10,15 @@ from smartratelimit import RateLimiter, RateLimitStatus
 
 def cmd_status(args):
     """Display rate limit status for endpoint(s)."""
-    limiter = RateLimiter(storage=args.storage)
+    limiter = RateLimiter(storage=args.storage, fail_closed=getattr(args, "fail_closed", False))
 
     if args.endpoint:
         endpoints = [args.endpoint]
     else:
-        # Get all endpoints from storage (if possible)
-        # For now, just show the specified endpoint
-        print("Error: --endpoint is required", file=sys.stderr)
-        sys.exit(1)
+        endpoints = limiter.list_endpoints()
+        if not endpoints:
+            print("Error: --endpoint is required", file=sys.stderr)
+            sys.exit(1)
 
     for endpoint in endpoints:
         status = limiter.get_status(endpoint)
@@ -46,7 +46,7 @@ def cmd_status(args):
 
 def cmd_clear(args):
     """Clear stored rate limit data."""
-    limiter = RateLimiter(storage=args.storage)
+    limiter = RateLimiter(storage=args.storage, fail_closed=getattr(args, "fail_closed", False))
     limiter.clear(args.endpoint)
 
     if args.endpoint:
@@ -59,7 +59,7 @@ def cmd_probe(args):
     """Probe an endpoint to detect rate limits."""
     import requests
 
-    limiter = RateLimiter(storage=args.storage)
+    limiter = RateLimiter(storage=args.storage, fail_closed=getattr(args, "fail_closed", False))
 
     try:
         print(f"Probing {args.url}...")
@@ -101,12 +101,26 @@ def cmd_probe(args):
 
 def cmd_list(args):
     """List all tracked endpoints."""
-    limiter = RateLimiter(storage=args.storage)
+    limiter = RateLimiter(storage=args.storage, fail_closed=getattr(args, "fail_closed", False))
+    endpoints = limiter.list_endpoints()
 
-    # This is a simplified version - in a real implementation,
-    # we'd need a way to list all endpoints from storage
-    print("Note: Listing all endpoints requires storage backend support")
-    print("Use 'smartratelimit status --endpoint <url>' to check specific endpoints")
+    if not endpoints:
+        print("No endpoints tracked in this storage backend.")
+        print("With 'memory' storage nothing persists between commands — point")
+        print("--storage at the same sqlite:// or redis:// URL your app uses.")
+        return
+
+    print(f"Tracked endpoints ({len(endpoints)}):\n")
+    for endpoint in endpoints:
+        status = limiter.get_status(endpoint)
+        if status:
+            print(
+                f"  {endpoint}\n"
+                f"      {status.remaining}/{status.limit} remaining, "
+                f"window {status.window}, {status.confidence}"
+            )
+        else:
+            print(f"  {endpoint}")
 
 
 def main():
@@ -122,12 +136,26 @@ def main():
         help="Storage backend (memory, sqlite:///path, redis://host:port)",
     )
 
+    parser.add_argument(
+        "--fail-closed",
+        action="store_true",
+        help=(
+            "Error out if the storage backend is unreachable instead of "
+            "silently falling back to in-memory state"
+        ),
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # Status command
     status_parser = subparsers.add_parser("status", help="Show rate limit status")
     status_parser.add_argument(
-        "endpoint", nargs="?", help="Endpoint URL or domain (optional)"
+        "endpoint",
+        nargs="?",
+        help=(
+            "Endpoint URL, domain, or domain plus path prefix "
+            "(e.g. api.example.com/search). Omit to show every tracked endpoint."
+        ),
     )
     status_parser.set_defaults(func=cmd_status)
 

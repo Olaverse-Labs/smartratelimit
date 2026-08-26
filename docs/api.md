@@ -32,8 +32,11 @@ Synchronous limiter built on `requests`.
 | `headers_map` | `dict \| None` | `None` | Custom header names: keys `limit`, `remaining`, `reset` |
 | `raise_on_limit` | `bool` | `False` | Raise `RateLimitExceeded` instead of waiting |
 | `retry` | `RetryConfig \| None` | `None` | How to retry a 429/503/504. Defaults to three attempts with jittered exponential backoff |
+| `fail_closed` | `bool` | `False` | Raise `StorageUnavailable` when shared storage is unreachable, instead of failing open and sending traffic unpaced |
 
-Raises `ValueError` for an unrecognised storage string. A SQLite or Redis backend that fails to initialise logs a warning and falls back to memory.
+Raises `ValueError` for an unrecognised storage string. `storage` also accepts a ready-made `StorageBackend` instance for options the connection string cannot express, such as a custom Redis `key_prefix`.
+
+A SQLite backend that cannot open its file logs a warning and falls back to memory. An unreachable Redis is kept — and warned about at construction — so it recovers on its own when Redis returns. With `fail_closed=True` both raise instead.
 
 If `default_limits` contains more than one key, the shortest window present wins (`second` → `minute` → `hour`) and the rest are ignored.
 
@@ -53,15 +56,21 @@ Your session stays the transport: its headers, cookies, auth, adapters, proxies 
 
 ### `.get_status(endpoint) -> RateLimitStatus | None`
 
-Current stored status for an endpoint. Accepts a bare domain or a full URL; both normalise to `scheme://host`. Returns `None` when nothing has been detected or set.
+Current stored status for an endpoint. Accepts a bare domain, a full URL, or a domain plus path prefix, and resolves to the narrowest scope governing it. A bare domain matches whichever scheme was actually stored, so an http-only API is not missed. Returns `None` when nothing has been detected or set.
 
 ### `.set_limit(endpoint, limit, window="1h") -> None`
 
 Store a limit explicitly, without waiting to detect one.
 
-`window` is a whole number plus a unit — `"30s"`, `"15m"`, `"1h"`, `"1d"`. Anything unparseable (including a decimal like `"1.5h"`) silently falls back to one hour.
+`endpoint` is a domain or URL, optionally narrowed by a path prefix — `"api.example.com"` covers the host, `"api.example.com/search"` covers only paths under `/search` and takes precedence there. Each scope gets its own bucket.
 
-A subsequently detected limit from response headers replaces what you set.
+`window` is a positive whole number plus a unit — `"30s"`, `"15m"`, `"1h"`, `"1d"`. Anything else, including a decimal like `"1.5h"`, raises `ValueError`: a mistyped window silently becoming one hour paces you against a limit you never asked for, with nothing to tell you.
+
+What you set is marked `confidence="configured"`, and **detected headers will not overwrite it** — you set it because the headers were absent or wrong.
+
+### `.list_endpoints() -> list[str]`
+
+Every endpoint scope with a stored rate limit, most specific first.
 
 ### `.clear(endpoint=None) -> None`
 

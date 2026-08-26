@@ -14,6 +14,7 @@ A Python library that automatically manages API rate limits, preventing 429 erro
 - 🔄 **Zero Configuration**: Works out of the box with most APIs
 - 💾 **Persistent State**: Supports in-memory, SQLite, and Redis storage
 - 🔀 **Multi-Process Safe**: SQLite and Redis backends consume tokens atomically, so workers on one box or many share one honest count
+- 🎚️ **Per-Path Limits**: Scope a limit to a path prefix — `/search` at 10/min alongside the host's 100/min — with the narrowest rule winning
 - 🎯 **Smart Waiting**: Automatically waits when limits are reached
 - 📊 **Status Monitoring**: Check current rate limit status anytime
 - 🔌 **Easy Integration**: Works with `requests`, `httpx`, and `aiohttp`
@@ -166,6 +167,66 @@ limiter.set_limit('api.another.com', limit=60, window='1m')
 # Window formats: '1h', '30m', '60s', '1d'
 ```
 
+### Per-Endpoint Limits
+
+Most APIs do not have one limit. `GET /search` might allow 10/minute while
+`GET /users` allows 100/minute — and a single host-wide bucket forces you to
+either throttle everything to the strictest limit or blow straight through the
+tight one.
+
+Scope a limit to a path prefix and the narrowest matching rule wins:
+
+```python
+limiter = RateLimiter()
+
+limiter.set_limit('api.example.com', limit=100, window='1m')          # host-wide
+limiter.set_limit('api.example.com/search', limit=10, window='1m')    # narrower
+limiter.set_limit('api.example.com/search/bulk', limit=2, window='1m')  # narrowest
+
+limiter.request('GET', 'https://api.example.com/search/bulk?q=x')  # paced at 2/min
+limiter.request('GET', 'https://api.example.com/search?q=x')       # paced at 10/min
+limiter.request('GET', 'https://api.example.com/users')            # paced at 100/min
+```
+
+Each scope gets its own token bucket, so exhausting `/search` leaves `/users`
+untouched. Resolution walks from the full path up to the bare host and uses the
+first scope with a stored limit, so a host-wide default and a narrow override
+need not know about each other.
+
+Query strings and trailing slashes are ignored when matching — they identify a
+request, not a quota. See what is being tracked with:
+
+```python
+limiter.list_endpoints()
+# ['https://api.example.com/search/bulk',
+#  'https://api.example.com/search',
+#  'https://api.example.com']
+```
+
+A limit you set is marked `confidence="configured"` and **detection will not
+overwrite it** — you set it because the headers were absent or wrong, so header
+values do not get to overrule you.
+
+### When the Limiter's Storage Goes Down
+
+By default an unreachable Redis fails **open**: the request goes out unpaced and
+a warning is logged. That keeps a limiter outage from taking your job down with
+it, which is right when the limit is advisory — and wrong when it guards a paid
+quota, where sending unpaced traffic is the more expensive failure.
+
+```python
+# Raise instead of sending unpaced traffic
+limiter = RateLimiter(storage='redis://localhost:6379/0', fail_closed=True)
+```
+
+With `fail_closed=True` an unreachable Redis raises `StorageUnavailable` (a
+subclass of `RateLimitExceeded`, so existing handlers keep working) at
+construction and on every acquire. Either way the failure is logged — it is
+never silent.
+
+Note that `redis-py` connects lazily, so the limiter pings Redis at construction
+rather than discovering the problem on your first real request.
+
 ### Custom Header Mapping
 
 ```python
@@ -305,6 +366,19 @@ Create a new rate limiter.
 - `raise_on_limit` (bool): If `True`, raise `RateLimitExceeded` instead of waiting
 - `retry` (RetryConfig): How to retry a request the server rejects with 429/503/504.
   Defaults to three attempts with jittered exponential backoff.
+- `fail_closed` (bool): If `True`, raise `StorageUnavailable` when shared storage
+  is unreachable instead of failing open and sending traffic unpaced.
+
+`storage` also accepts a ready-made `StorageBackend` instance, for options the
+connection string cannot express:
+
+```python
+from smartratelimit.storage import RedisStorage
+
+limiter = RateLimiter(
+    storage=RedisStorage('redis://localhost:6379/0', key_prefix='myapp:')
+)
+```
 
 ```python
 from smartratelimit.retry import RetryConfig, RetryStrategy
@@ -344,18 +418,27 @@ over. Wrapping the same session twice is a no-op.
 
 #### `get_status(endpoint: str) -> RateLimitStatus | None`
 
-Get current rate limit status for an endpoint.
+Get current rate limit status for an endpoint. Accepts a bare domain, a full
+URL, or a domain plus path prefix; a bare domain matches whichever scheme was
+actually stored, so an http-only API is not missed.
 
 **Returns:** `RateLimitStatus` object or `None` if no info available
+
+#### `list_endpoints() -> list[str]`
+
+Every endpoint scope with a stored rate limit, most specific first.
 
 #### `set_limit(endpoint: str, limit: int, window: str = '1h') -> None`
 
 Manually set rate limit for an endpoint.
 
 **Parameters:**
-- `endpoint`: Endpoint URL or domain
+- `endpoint`: Endpoint URL or domain, optionally narrowed by a path prefix
+  (`'api.example.com/search'`). The narrowest matching scope wins.
 - `limit`: Maximum number of requests
-- `window`: Time window ('1h', '1m', '30s', '1d')
+- `window`: Time window ('1h', '1m', '30s', '1d'). **Raises `ValueError`** if it
+  is not a positive whole number plus `d`/`h`/`m`/`s` — a mistyped `'1.5h'`
+  silently becoming one hour is worse than a loud error at startup.
 
 #### `clear(endpoint: str | None = None) -> None`
 

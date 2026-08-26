@@ -1,23 +1,30 @@
 """Storage backends for rate limit state."""
 
+import logging
 import sqlite3
 import threading
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Tuple
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from smartratelimit._time import to_epoch as _to_epoch
+from smartratelimit._time import utcfromtimestamp as _from_epoch
+from smartratelimit._time import utcnow
 from smartratelimit.models import RateLimit, TokenBucket
 
-
-def _to_epoch(dt: datetime) -> float:
-    """Convert a naive UTC datetime to a Unix timestamp."""
-    return dt.replace(tzinfo=timezone.utc).timestamp()
+logger = logging.getLogger(__name__)
 
 
-def _from_epoch(ts: float) -> datetime:
-    """Convert a Unix timestamp to a naive UTC datetime."""
-    return datetime.utcfromtimestamp(ts)
+def _covers(scope: str, key: str) -> bool:
+    """
+    Whether clearing ``scope`` should also remove ``key``.
+
+    Clearing a host clears the path scopes under it, and their buckets. The
+    boundary character matters: a bare ``startswith`` would let
+    ``https://api.example.com`` match ``https://api.example.com.evil.com``.
+    """
+    return key == scope or key.startswith(scope + "/") or key.startswith(scope + ":")
 
 
 class StorageBackend(ABC):
@@ -47,6 +54,32 @@ class StorageBackend(ABC):
     def clear(self, endpoint: Optional[str] = None) -> None:
         """Clear stored data for endpoint or all data."""
         pass
+
+    @abstractmethod
+    def list_endpoints(self) -> List[str]:
+        """List every endpoint key that currently has a stored rate limit."""
+        pass
+
+    def get_rate_limit_for(self, candidates: List[str]) -> Optional[RateLimit]:
+        """
+        Return the stored limit for the first candidate that has one.
+
+        Callers pass endpoint scopes most-specific-first, so a rule on
+        ``https://host/search`` is found before the host-wide one. Backends
+        override this to answer in a single round trip; the default walks the
+        list, which is right for in-process storage.
+
+        Args:
+            candidates: Scope keys, most specific first.
+
+        Returns:
+            The matching :class:`RateLimit`, or None if none is stored.
+        """
+        for key in candidates:
+            rate_limit = self.get_rate_limit(key)
+            if rate_limit is not None:
+                return rate_limit
+        return None
 
     @abstractmethod
     def acquire(
@@ -95,7 +128,7 @@ class MemoryStorage(StorageBackend):
         self._token_buckets: Dict[str, TokenBucket] = {}
         self._lock = threading.RLock()
         self._cleanup_interval = cleanup_interval
-        self._last_cleanup = datetime.utcnow()
+        self._last_cleanup = utcnow()
 
     def _get_endpoint_key(self, url: str) -> str:
         """Extract endpoint key from URL."""
@@ -104,7 +137,7 @@ class MemoryStorage(StorageBackend):
 
     def _cleanup_expired(self) -> None:
         """Remove expired rate limit entries."""
-        now = datetime.utcnow()
+        now = utcnow()
         if (now - self._last_cleanup).total_seconds() < self._cleanup_interval:
             return
 
@@ -146,16 +179,18 @@ class MemoryStorage(StorageBackend):
         """Clear stored data for endpoint or all data."""
         with self._lock:
             if endpoint:
-                self._rate_limits.pop(endpoint, None)
-                # Clear all token buckets for this endpoint
-                keys_to_remove = [
-                    k for k in self._token_buckets.keys() if k.startswith(endpoint)
-                ]
-                for key in keys_to_remove:
+                for key in [k for k in self._rate_limits if _covers(endpoint, k)]:
+                    del self._rate_limits[key]
+                for key in [k for k in self._token_buckets if _covers(endpoint, k)]:
                     del self._token_buckets[key]
             else:
                 self._rate_limits.clear()
                 self._token_buckets.clear()
+
+    def list_endpoints(self) -> List[str]:
+        """List every endpoint key that currently has a stored rate limit."""
+        with self._lock:
+            return list(self._rate_limits.keys())
 
     def acquire(
         self,
@@ -395,12 +430,15 @@ class SQLiteStorage(StorageBackend):
             conn = self._get_connection()
             try:
                 if endpoint:
+                    # Exact scope, plus everything nested under it.
                     conn.execute(
-                        "DELETE FROM rate_limits WHERE endpoint = ?", (endpoint,)
+                        "DELETE FROM rate_limits "
+                        "WHERE endpoint = ? OR endpoint LIKE ? OR endpoint LIKE ?",
+                        (endpoint, f"{endpoint}/%", f"{endpoint}:%"),
                     )
                     conn.execute(
-                        "DELETE FROM token_buckets WHERE key LIKE ?",
-                        (f"{endpoint}%",),
+                        "DELETE FROM token_buckets WHERE key = ? OR key LIKE ? OR key LIKE ?",
+                        (endpoint, f"{endpoint}/%", f"{endpoint}:%"),
                     )
                 else:
                     conn.execute("DELETE FROM rate_limits")
@@ -409,6 +447,52 @@ class SQLiteStorage(StorageBackend):
             finally:
                 if self._conn is None:
                     conn.close()
+
+    def list_endpoints(self) -> List[str]:
+        """List every endpoint key that currently has a stored rate limit."""
+        with self._lock:
+            conn = self._get_connection()
+            try:
+                cursor = conn.execute("SELECT endpoint FROM rate_limits")
+                return [row[0] for row in cursor.fetchall()]
+            finally:
+                if self._conn is None:
+                    conn.close()
+
+    def get_rate_limit_for(self, candidates: List[str]) -> Optional[RateLimit]:
+        """Resolve the most specific stored scope in one query."""
+        if not candidates:
+            return None
+
+        with self._lock:
+            conn = self._get_connection()
+            try:
+                conn.row_factory = sqlite3.Row
+                placeholders = ",".join("?" for _ in candidates)
+                cursor = conn.execute(
+                    f"SELECT * FROM rate_limits WHERE endpoint IN ({placeholders})",
+                    tuple(candidates),
+                )
+                rows = {row["endpoint"]: row for row in cursor.fetchall()}
+            finally:
+                if self._conn is None:
+                    conn.close()
+
+        # Candidate order is the precedence order, so honour it here rather
+        # than letting SQL decide.
+        for key in candidates:
+            row = rows.get(key)
+            if row is not None:
+                return RateLimit(
+                    endpoint=row["endpoint"],
+                    limit=row["limit_value"],
+                    remaining=row["remaining"],
+                    reset_time=self._str_to_datetime(row["reset_time"]),
+                    window=timedelta(seconds=row["window_seconds"]),
+                    last_updated=self._str_to_datetime(row["last_updated"]),
+                    confidence=row["confidence"],
+                )
+        return None
 
     def acquire(
         self,
@@ -435,7 +519,7 @@ class SQLiteStorage(StorageBackend):
                         (key,),
                     )
                     row = cursor.fetchone()
-                    now = datetime.utcnow()
+                    now = utcnow()
 
                     if row is None:
                         bucket = TokenBucket(
@@ -543,13 +627,26 @@ class RedisStorage(StorageBackend):
     return {allowed, tostring(wait)}
     """
 
-    def __init__(self, redis_url: str = "redis://localhost:6379/0", key_prefix: str = "ratelimit:"):
+    def __init__(
+        self,
+        redis_url: str = "redis://localhost:6379/0",
+        key_prefix: str = "ratelimit:",
+        fail_closed: bool = False,
+    ):
         """
         Initialize Redis storage.
 
         Args:
             redis_url: Redis connection URL
             key_prefix: Prefix for all keys stored in Redis
+            fail_closed: What to do when Redis cannot be reached during a call.
+                The default (False) fails *open* — the request is allowed
+                through unpaced, so a Redis outage cannot take your job down
+                with it. Set True when the limit guards something costly, such
+                as a paid API quota, and sending unpaced traffic is worse than
+                raising: ``acquire`` then raises
+                :class:`~smartratelimit._base.StorageUnavailable` instead of
+                waving requests through.
         """
         try:
             import redis
@@ -561,8 +658,26 @@ class RedisStorage(StorageBackend):
 
         self.redis_client = redis.from_url(redis_url, decode_responses=False)
         self.key_prefix = key_prefix
+        self.fail_closed = fail_closed
         self._lock = threading.RLock()
         self._acquire_script = self.redis_client.register_script(self._ACQUIRE_LUA)
+
+        # redis-py connects lazily, so without this a dead Redis looks healthy
+        # until the first request -- and then quietly stops limiting. Check now
+        # and say so. The client is kept either way: a Redis that is briefly
+        # down at boot comes back, and swapping permanently to per-process
+        # limits would mean never noticing that it did.
+        try:
+            self.redis_client.ping()
+        except Exception as e:
+            if fail_closed:
+                raise ConnectionError(f"cannot reach Redis at {redis_url}: {e}") from e
+            logger.warning(
+                "Cannot reach Redis at %s (%s). Requests will not be paced until "
+                "it returns. Pass fail_closed=True to fail fast instead.",
+                redis_url,
+                e,
+            )
 
     def _make_key(self, key: str) -> bytes:
         """Create a Redis key with prefix."""
@@ -608,7 +723,8 @@ class RedisStorage(StorageBackend):
                     last_updated=self._str_to_datetime(data[b"last_updated"]),
                     confidence=data.get(b"confidence", b"confirmed").decode("utf-8"),
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug("Redis read failed (%s); treating as no stored value", e)
                 return None
 
     def set_rate_limit(self, endpoint: str, rate_limit: RateLimit) -> None:
@@ -628,8 +744,8 @@ class RedisStorage(StorageBackend):
                 # Set expiration to window + 1 hour for cleanup
                 ttl = int((rate_limit.window + timedelta(hours=1)).total_seconds())
                 self.redis_client.expire(key, ttl)
-            except Exception:
-                pass  # Graceful degradation
+            except Exception as e:
+                logger.warning("Redis write failed (%s); state not persisted", e)
 
     def get_token_bucket(self, key: str) -> Optional[TokenBucket]:
         """Get token bucket for a key."""
@@ -646,7 +762,8 @@ class RedisStorage(StorageBackend):
                     refill_rate=float(data[b"refill_rate"]),
                     last_update=self._parse_bucket_timestamp(data[b"last_update"]),
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug("Redis read failed (%s); treating as no stored value", e)
                 return None
 
     def set_token_bucket(self, key: str, bucket: TokenBucket) -> None:
@@ -663,28 +780,77 @@ class RedisStorage(StorageBackend):
                 self.redis_client.hset(redis_key, mapping=data)
                 # Set expiration to 24 hours for cleanup
                 self.redis_client.expire(redis_key, 86400)
-            except Exception:
-                pass  # Graceful degradation
+            except Exception as e:
+                logger.warning("Redis write failed (%s); state not persisted", e)
 
     def clear(self, endpoint: Optional[str] = None) -> None:
         """Clear stored data for endpoint or all data."""
         with self._lock:
             try:
                 if endpoint:
-                    # Delete rate limit
-                    rate_limit_key = self._make_key(f"rate_limit:{endpoint}")
-                    self.redis_client.delete(rate_limit_key)
-                    # Delete token buckets for this endpoint
-                    pattern = self._make_key(f"token_bucket:{endpoint}*")
-                    for key in self.redis_client.scan_iter(match=pattern):
-                        self.redis_client.delete(key)
+                    # Exact scope, plus everything nested under it. Scanning and
+                    # filtering in Python keeps the boundary rule identical to
+                    # the other backends, and avoids glob metacharacters in a
+                    # URL being interpreted as a pattern.
+                    for namespace in ("rate_limit:", "token_bucket:"):
+                        prefix = f"{self.key_prefix}{namespace}"
+                        pattern = f"{prefix}*".encode("utf-8")
+                        for key in self.redis_client.scan_iter(match=pattern):
+                            stored = key.decode("utf-8")[len(prefix):]
+                            if _covers(endpoint, stored):
+                                self.redis_client.delete(key)
                 else:
                     # Delete all keys with prefix
                     pattern = self._make_key("*")
                     for key in self.redis_client.scan_iter(match=pattern):
                         self.redis_client.delete(key)
-            except Exception:
-                pass  # Graceful degradation
+            except Exception as e:
+                logger.warning("Redis write failed (%s); state not persisted", e)
+
+    def list_endpoints(self) -> List[str]:
+        """List every endpoint key that currently has a stored rate limit."""
+        prefix = f"{self.key_prefix}rate_limit:"
+        try:
+            pattern = f"{prefix}*".encode("utf-8")
+            return [
+                key.decode("utf-8")[len(prefix):]
+                for key in self.redis_client.scan_iter(match=pattern)
+            ]
+        except Exception as e:
+            logger.warning("Redis scan failed (%s); reporting no endpoints", e)
+            return []
+
+    def get_rate_limit_for(self, candidates: List[str]) -> Optional[RateLimit]:
+        """Resolve the most specific stored scope in one pipelined round trip."""
+        if not candidates:
+            return None
+
+        try:
+            pipe = self.redis_client.pipeline()
+            for key in candidates:
+                pipe.hgetall(self._make_key(f"rate_limit:{key}"))
+            results = pipe.execute()
+        except Exception as e:
+            logger.debug("Redis pipeline failed (%s); treating as no stored value", e)
+            return None
+
+        # Candidate order is the precedence order.
+        for key, data in zip(candidates, results):
+            if not data:
+                continue
+            try:
+                return RateLimit(
+                    endpoint=key,
+                    limit=int(data[b"limit"]),
+                    remaining=int(data[b"remaining"]),
+                    reset_time=self._str_to_datetime(data[b"reset_time"]),
+                    window=timedelta(seconds=float(data[b"window_seconds"])),
+                    last_updated=self._str_to_datetime(data[b"last_updated"]),
+                    confidence=data.get(b"confidence", b"confirmed").decode("utf-8"),
+                )
+            except (KeyError, ValueError) as e:
+                logger.debug("Skipping malformed rate limit for %s: %s", key, e)
+        return None
 
     def acquire(
         self,
@@ -704,9 +870,24 @@ class RedisStorage(StorageBackend):
                 keys=[redis_key],
                 args=[capacity, refill_rate, tokens, ttl],
             )
-        except Exception:
-            # Redis is unreachable or the script failed. Fail open rather than
-            # blocking the caller's traffic on a limiter outage.
+        except Exception as e:
+            if self.fail_closed:
+                from smartratelimit._base import StorageUnavailable
+
+                raise StorageUnavailable(
+                    f"Redis is unavailable and fail_closed=True, so {key!r} "
+                    f"cannot be paced: {e}"
+                ) from e
+
+            # Fail open: a limiter outage should not take the caller's traffic
+            # down with it. Loud, because the shared limit is not being
+            # enforced while this lasts.
+            logger.warning(
+                "Redis unavailable (%s) -- allowing request for %s unpaced. "
+                "Pass fail_closed=True to raise instead.",
+                e,
+                key,
+            )
             return True, 0.0
 
         wait_seconds = float(wait)

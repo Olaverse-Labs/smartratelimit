@@ -61,7 +61,7 @@ The `storage=` string is the one decision that matters at setup. Everything else
 
 **Redis keys expire on their own.** Rate limits get a TTL of their window plus an hour; token buckets get 24 hours. Nothing to clean up.
 
-**Both fail soft.** An unreachable Redis or an unwritable SQLite path logs a warning and falls back to memory. Check explicitly at startup if shared state is load-bearing — see the note in [How it works](concepts.md#4-storage).
+**Failure is a choice you make.** By default an unreachable Redis fails *open*: the request goes out unpaced and a warning is logged, so a limiter outage cannot take your job down with it. When the limit guards something costly — a paid API quota — that is the wrong trade, and `fail_closed=True` raises `StorageUnavailable` instead. Redis is pinged at construction rather than on your first real request, because `redis-py` connects lazily and would otherwise look healthy right up until it silently stopped limiting.
 
 ## Connection strings
 
