@@ -33,6 +33,8 @@ Synchronous limiter built on `requests`.
 | `raise_on_limit` | `bool` | `False` | Raise `RateLimitExceeded` instead of waiting |
 | `retry` | `RetryConfig \| None` | `None` | How to retry a 429/503/504. Defaults to three attempts with jittered exponential backoff |
 | `fail_closed` | `bool` | `False` | Raise `StorageUnavailable` when shared storage is unreachable, instead of failing open and sending traffic unpaced |
+| `use_provider_profiles` | `bool` | `True` | Seed documented limits for known hosts before their first response — see [Provider Profiles](providers.md) |
+| `authenticated` | `bool` | `False` | Whether requests carry credentials. Documented limits often differ by orders of magnitude between anonymous and authenticated callers |
 
 Raises `ValueError` for an unrecognised storage string. `storage` also accepts a ready-made `StorageBackend` instance for options the connection string cannot express, such as a custom Redis `key_prefix`.
 
@@ -40,9 +42,11 @@ A SQLite backend that cannot open its file logs a warning and falls back to memo
 
 If `default_limits` contains more than one key, the shortest window present wins (`second` → `minute` → `hour`) and the rest are ignored.
 
-### `.request(method, url, **kwargs) -> requests.Response`
+### `.request(method, url, cost=None, **kwargs) -> requests.Response`
 
 Make a paced request. `**kwargs` are passed through to `requests.request()`.
+
+`cost` says what this request spends. `None` is one request; a number is that many requests; a mapping such as `{"tokens": 1500}` charges other [metered dimensions](concepts.md#6-dimensions) too, with `requests` defaulting to 1 inside it. Every dimension named is charged in one atomic step — a request never spends its request allowance and is then refused for tokens.
 
 Waits (or raises, with `raise_on_limit=True`) when the endpoint's bucket is empty, then updates the stored quota from the response headers.
 
@@ -61,6 +65,8 @@ Current stored status for an endpoint. Accepts a bare domain, a full URL, or a d
 ### `.set_limit(endpoint, limit, window="1h") -> None`
 
 Store a limit explicitly, without waiting to detect one.
+
+`dimension` (default `"requests"`) is what is being metered. Call `set_limit` again with another name to add a second budget to the same scope; a request then has to satisfy both.
 
 `endpoint` is a domain or URL, optionally narrowed by a path prefix — `"api.example.com"` covers the host, `"api.example.com/search"` covers only paths under `/search` and takes precedence there. Each scope gets its own bucket.
 

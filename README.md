@@ -15,6 +15,8 @@ A Python library that automatically manages API rate limits, preventing 429 erro
 - 💾 **Persistent State**: Supports in-memory, SQLite, and Redis storage
 - 🔀 **Multi-Process Safe**: SQLite and Redis backends consume tokens atomically, so workers on one box or many share one honest count
 - 🎚️ **Per-Path Limits**: Scope a limit to a path prefix — `/search` at 10/min alongside the host's 100/min — with the narrowest rule winning
+- 🧮 **Multi-Dimensional Limits**: Meter tokens per minute alongside requests per minute, charged atomically together — the budget that actually binds on LLM APIs
+- 📇 **Provider Profiles**: Documented limits for APIs that don't advertise them, so the first request isn't sent blind
 - 🎯 **Smart Waiting**: Automatically waits when limits are reached
 - 📊 **Status Monitoring**: Check current rate limit status anytime
 - 🔌 **Easy Integration**: Works with `requests`, `httpx`, and `aiohttp`
@@ -207,6 +209,89 @@ A limit you set is marked `confidence="configured"` and **detection will not
 overwrite it** — you set it because the headers were absent or wrong, so header
 values do not get to overrule you.
 
+### Multi-Dimensional Limits (Tokens, Not Just Requests)
+
+Requests per minute is rarely the constraint that bites on an LLM API. OpenAI
+meters **tokens per minute** as well, and a caller comfortably inside its request
+budget still gets a 429 once the token budget is spent.
+
+Meter both, and a request has to satisfy both:
+
+```python
+limiter = RateLimiter()
+limiter.set_limit('api.openai.com', limit=3500, window='1m')                       # RPM
+limiter.set_limit('api.openai.com', limit=90000, window='1m', dimension='tokens')  # TPM
+
+response = limiter.request(
+    'POST', 'https://api.openai.com/v1/chat/completions',
+    json=payload,
+    cost={'tokens': estimated_tokens},
+)
+```
+
+`cost` says what this call spends. Omit it and the call costs one request;
+pass a mapping and every dimension named is charged. `requests` defaults to 1
+inside a mapping — a 1500-token call is still one request unless you say
+otherwise.
+
+**The charge is all-or-nothing.** Both budgets are debited in a single atomic
+step, so a request can never spend its request allowance and then be refused for
+tokens — a leak that would quietly drain the wrong budget on every rejection.
+Refused requests charge nothing at all:
+
+```python
+status = limiter.get_status('api.openai.com')
+status.dimensions['requests'].remaining   # 3495 after 5 calls
+status.dimensions['tokens'].remaining     # 80000
+```
+
+A dimension a request doesn't spend never gates it, so `GET /v1/models` with no
+`cost` isn't held up by an exhausted token budget.
+
+OpenAI's and Anthropic's token headers are detected automatically, as is the
+generic `X-RateLimit-*-Tokens` convention — you only need `set_limit` for APIs
+that don't advertise.
+
+### Provider Profiles
+
+Some limits can't be learned from a response in time to be useful. GitHub allows
+**60 requests an hour** unauthenticated — low enough that discovering it from the
+first response has already cost you a meaningful slice of the budget, and nothing
+in a response tells you whether your credentials were accepted before you send
+one.
+
+Known hosts are seeded from a built-in profile:
+
+```python
+limiter = RateLimiter()                        # seeds GitHub at 60/hour
+limiter = RateLimiter(authenticated=True)      # seeds GitHub at 5000/hour
+limiter = RateLimiter(use_provider_profiles=False)   # off
+```
+
+Seeds are marked `confidence="registry"` and are **replaced the moment the API
+reports its own numbers**. They get you a sensible first request, not a permanent
+answer.
+
+**The built-in table is deliberately tiny and should stay that way.** Most
+providers meter per account tier — OpenAI's RPM depends on which tier you're on,
+not on OpenAI — so a baked-in number would be a guess about *your* account, and a
+wrong baked-in limit is worse than none. Those providers also send their limits
+in headers, which detection already reads. An entry earns its place only when the
+number can't be detected in time *and* is a property of the API rather than of
+your account.
+
+Your own services are the natural case for adding one:
+
+```python
+from smartratelimit import Provider, SeedLimit, register_provider
+
+register_provider('internal.api', Provider(
+    name='Internal service',
+    reason='Sends no rate-limit headers; limit is in the runbook.',
+    scopes={'': [SeedLimit(25, '1m'), SeedLimit(50_000, '1m', dimension='tokens')]},
+))
+```
+
 ### When the Limiter's Storage Goes Down
 
 By default an unreachable Redis fails **open**: the request goes out unpaced and
@@ -368,6 +453,10 @@ Create a new rate limiter.
   Defaults to three attempts with jittered exponential backoff.
 - `fail_closed` (bool): If `True`, raise `StorageUnavailable` when shared storage
   is unreachable instead of failing open and sending traffic unpaced.
+- `use_provider_profiles` (bool): Seed documented limits for known hosts before
+  their first response. Default `True`.
+- `authenticated` (bool): Whether requests carry credentials. Documented limits
+  often differ by orders of magnitude between anonymous and authenticated callers.
 
 `storage` also accepts a ready-made `StorageBackend` instance, for options the
 connection string cannot express:
@@ -398,13 +487,17 @@ server knows when its window reopens. Both the seconds form and the HTTP-date
 form are honoured, capped at `max_delay`. `RetryStrategy.NONE` means one
 attempt, no retries.
 
-#### `request(method, url, **kwargs) -> requests.Response`
+#### `request(method, url, cost=None, **kwargs) -> requests.Response`
 
 Make a rate-limited HTTP request.
 
 **Parameters:**
 - `method` (str): HTTP method (GET, POST, PUT, DELETE, PATCH)
 - `url` (str): Request URL
+- `cost` (dict | number | None): What this request spends. `None` is one request;
+  a number is that many requests; a mapping like `{'tokens': 1500}` charges other
+  metered dimensions too, with `requests` defaulting to 1. Every dimension named
+  is charged atomically together.
 - `**kwargs`: Additional arguments passed to `requests.request()`
 
 **Returns:** `requests.Response` object
@@ -435,7 +528,9 @@ Manually set rate limit for an endpoint.
 **Parameters:**
 - `endpoint`: Endpoint URL or domain, optionally narrowed by a path prefix
   (`'api.example.com/search'`). The narrowest matching scope wins.
-- `limit`: Maximum number of requests
+- `limit`: Maximum units of `dimension` per window
+- `dimension`: What is being metered, default `'requests'`. Call again with
+  another name (`'tokens'`) to add a second budget to the same scope.
 - `window`: Time window ('1h', '1m', '30s', '1d'). **Raises `ValueError`** if it
   is not a positive whole number plus `d`/`h`/`m`/`s` — a mistyped `'1.5h'`
   silently becoming one hour is worse than a loud error at startup.
@@ -457,7 +552,9 @@ Status information about current rate limits.
 - `remaining` (int): Remaining requests
 - `reset_time` (datetime): When the limit resets
 - `window` (timedelta): Time window for the limit
-- `confidence` (str): `'confirmed'`, `'estimated'` or `'configured'` — see above
+- `confidence` (str): `'confirmed'`, `'estimated'`, `'configured'` or `'registry'`
+- `dimensions` (dict[str, LimitDimension]): Every metered dimension, keyed by
+  name, including `requests`
 - `reset_in` (float): Seconds until reset (property)
 - `is_exceeded` (bool): Whether limit is exceeded (property)
 - `utilization` (float): Utilization percentage 0.0-1.0 (property)

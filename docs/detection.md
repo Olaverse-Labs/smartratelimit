@@ -88,6 +88,26 @@ The 86400 cutoff is the one rule to remember: a reset expressed as "seconds rema
 
 Timestamps that resolve to a time in the past are discarded, and the window falls back to one hour.
 
+## Metered dimensions beyond requests
+
+An LLM API meters tokens as well as requests, and the token budget is usually the
+one that binds first. Those headers are read too, and stored as separate
+[dimensions](concepts.md#6-dimensions) of the same scope:
+
+| Host | Dimension | Headers |
+|---|---|---|
+| `api.openai.com` | `tokens` | `x-ratelimit-{limit,remaining,reset}-tokens` |
+| `api.anthropic.com` | `tokens` | `anthropic-ratelimit-tokens-{limit,remaining,reset}` |
+| `api.anthropic.com` | `input_tokens`, `output_tokens` | `anthropic-ratelimit-{input,output}-tokens-*` |
+| any | `tokens` | `X-RateLimit-{Limit,Remaining,Reset}-Tokens` |
+
+Reading only the request headers would leave the limiter confidently pacing
+against a number that is not the constraint. Tell it what each call costs:
+
+```python
+limiter.request("POST", url, json=payload, cost={"tokens": 1500})
+```
+
 ## Gaps and fallbacks
 
 APIs are inconsistent. What happens when a piece is missing:

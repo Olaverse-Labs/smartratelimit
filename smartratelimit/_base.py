@@ -16,7 +16,14 @@ from urllib.parse import urlparse
 
 from smartratelimit._time import utcnow
 from smartratelimit.detector import RateLimitDetector
-from smartratelimit.models import RateLimit, RateLimitStatus, TokenBucket
+from smartratelimit.models import (
+    REQUESTS,
+    LimitDimension,
+    RateLimit,
+    RateLimitStatus,
+    TokenBucket,
+)
+from smartratelimit.providers import seed_limits
 from smartratelimit.retry import RetryConfig, RetryHandler
 from smartratelimit.storage import (
     MemoryStorage,
@@ -62,8 +69,13 @@ class LimiterBase:
         raise_on_limit: bool = False,
         retry: Optional[RetryConfig] = None,
         fail_closed: bool = False,
+        use_provider_profiles: bool = True,
+        authenticated: bool = False,
     ):
         self._fail_closed = fail_closed
+        self._use_provider_profiles = use_provider_profiles
+        self._authenticated = authenticated
+        self._seeded_hosts = set()
         self._storage = self._create_storage(storage)
         self._detector = RateLimitDetector(headers_map)
         self._default_limits = default_limits or {}
@@ -199,12 +211,88 @@ class LimiterBase:
         return candidates
 
     def _get_bucket_key(self, scope: str, limit_type: str = "default") -> str:
-        """Token bucket key for a scope."""
+        """
+        Token bucket key for one dimension of a scope.
+
+        The ``requests`` dimension keeps the historical ``:default`` suffix, so
+        buckets written by earlier versions are still found.
+        """
+        if limit_type == REQUESTS:
+            limit_type = "default"
         return f"{scope}:{limit_type}"
 
     def _resolve_limit(self, url: str) -> Optional[RateLimit]:
         """Find the most specific stored limit governing ``url``."""
         return self._storage.get_rate_limit_for(self._candidate_scopes(url))
+
+    @staticmethod
+    def _normalize_cost(cost) -> Dict[str, float]:
+        """
+        Turn a caller's cost into a per-dimension mapping.
+
+        ``None`` means one request. A bare number is that many requests. A dict
+        is taken as given, and ``requests`` defaults to 1 within it -- a call
+        costing 1500 tokens is still one request unless you say otherwise.
+        """
+        if cost is None:
+            return {REQUESTS: 1.0}
+
+        if isinstance(cost, (int, float)):
+            return {REQUESTS: float(cost)}
+
+        if not isinstance(cost, dict):
+            raise TypeError(
+                f"cost must be a number or a mapping of dimension to amount, "
+                f"got {type(cost).__name__}"
+            )
+
+        normalized = {str(k): float(v) for k, v in cost.items()}
+        normalized.setdefault(REQUESTS, 1.0)
+        return normalized
+
+    def _acquire_specs(self, rate_limit: RateLimit, cost) -> List[tuple]:
+        """
+        Build the ``(key, capacity, refill_rate, tokens)`` list for one request.
+
+        Only dimensions this request actually spends are included, so a call
+        with no token cost is not gated on the token budget.
+        """
+        costs = self._normalize_cost(cost)
+        specs = []
+
+        for dimension in rate_limit.all_dimensions():
+            amount = costs.get(dimension.name, 0.0)
+            if amount <= 0:
+                continue
+
+            window_seconds = dimension.window.total_seconds() if dimension.window else 0.0
+            if dimension.limit <= 0 or window_seconds <= 0:
+                continue
+
+            capacity = float(dimension.limit)
+            specs.append(
+                (
+                    self._get_bucket_key(rate_limit.endpoint, dimension.name),
+                    capacity,
+                    capacity / window_seconds,
+                    amount,
+                )
+            )
+
+        unknown = set(costs) - {d.name for d in rate_limit.all_dimensions()}
+        for name in sorted(unknown):
+            if costs[name] > 0:
+                # Spending a dimension nothing meters is almost always a typo
+                # or a limit you meant to configure; silently ignoring it would
+                # look like the limiter working.
+                logger.warning(
+                    "Request to %s declares a cost for %r, which has no "
+                    "configured limit — that cost is not being metered.",
+                    rate_limit.endpoint,
+                    name,
+                )
+
+        return specs
 
     # ------------------------------------------------------------------
     # Buckets
@@ -251,16 +339,8 @@ class LimiterBase:
         Both limiters funnel here with a plain url/status/headers triple, so
         detection behaves identically for `requests`, httpx and aiohttp.
         """
-        detected = self._detector.detect(url, status_code, headers)
-        if not detected:
-            return
-
-        limit = detected.get("limit")
-        remaining = detected.get("remaining")
-        reset_time = detected.get("reset_time")
-        window = detected.get("window")
-
-        if not (limit and reset_time and window):
+        detections = self._detector.detect_all(url, status_code, headers)
+        if not detections:
             return
 
         # Write to whichever scope is actually governing this URL, so a
@@ -268,35 +348,129 @@ class LimiterBase:
         existing = self._resolve_limit(url)
         scope = existing.endpoint if existing else self._get_endpoint_key(url)
 
-        if existing is not None and existing.confidence == "configured":
-            # You set this deliberately, most likely because the headers are
-            # absent or wrong. Detection does not get to overrule that.
-            logger.debug(
-                "Ignoring detected limit for %s: an explicit limit is configured",
-                scope,
+        for detected in detections:
+            limit = detected.get("limit")
+            remaining = detected.get("remaining")
+            reset_time = detected.get("reset_time")
+            window = detected.get("window")
+            name = detected.get("dimension", REQUESTS)
+
+            if not (limit and reset_time and window):
+                continue
+
+            current = existing.dimension(name) if existing else None
+            # A registry seed is a placeholder and yields to real headers; an
+            # explicitly configured limit does not.
+            if current is not None and current.confidence == "configured":
+                # You set this deliberately, most likely because the headers are
+                # absent or wrong. Detection does not get to overrule that.
+                logger.debug(
+                    "Ignoring detected %s limit for %s: explicitly configured",
+                    name,
+                    scope,
+                )
+                continue
+
+            dimension = LimitDimension(
+                name=name,
+                limit=limit,
+                remaining=remaining if remaining is not None else limit,
+                reset_time=reset_time,
+                window=window,
+                confidence=detected.get("confidence", "confirmed"),
             )
+
+            base = existing or RateLimit(
+                endpoint=scope,
+                limit=limit,
+                remaining=dimension.remaining,
+                reset_time=reset_time,
+                window=window,
+                confidence=dimension.confidence,
+            )
+            existing = base.with_dimension(dimension)
+            self._storage.set_rate_limit(scope, existing)
+
+            # The server's own count is more authoritative than ours, so trust
+            # it -- but write the corrected bucket back, or persistent backends
+            # never see the correction.
+            if remaining is not None:
+                key = self._get_bucket_key(scope, name)
+                bucket = self._storage.get_token_bucket(key)
+                capacity = float(limit)
+                refill_rate = capacity / window.total_seconds()
+                if bucket is None:
+                    bucket = TokenBucket(
+                        capacity=capacity, tokens=capacity, refill_rate=refill_rate
+                    )
+                bucket.capacity = capacity
+                bucket.refill_rate = refill_rate
+                bucket.tokens = min(capacity, float(remaining))
+                bucket.last_update = utcnow()
+                self._storage.set_token_bucket(key, bucket)
+
+            logger.debug(
+                "Rate limit updated for %s [%s]: %s/%s remaining",
+                scope,
+                name,
+                remaining,
+                limit,
+            )
+
+    def _apply_provider_profile(self, url: str) -> None:
+        """
+        Seed documented limits for a known host, before its first response.
+
+        Only fills scopes that have nothing stored, and marks what it writes
+        ``confidence="registry"`` so the API's own headers replace it as soon as
+        they arrive. The point is not to be authoritative — it is to keep the
+        first request to a 60-per-hour endpoint from being sent blind.
+        """
+        if not self._use_provider_profiles:
             return
 
-        rate_limit = RateLimit(
-            endpoint=scope,
-            limit=limit,
-            remaining=remaining if remaining is not None else limit,
-            reset_time=reset_time,
-            window=window,
-            confidence=detected.get("confidence", "confirmed"),
-        )
-        self._storage.set_rate_limit(scope, rate_limit)
+        parsed = urlparse(url)
+        host = parsed.netloc.lower()
+        if not host or host in self._seeded_hosts:
+            return
 
-        # The server's own count is more authoritative than ours, so trust it --
-        # but write the corrected bucket back, or persistent backends never see
-        # the correction.
-        if remaining is not None:
-            bucket = self._get_or_create_bucket(scope, limit, window)
-            bucket.tokens = min(bucket.capacity, float(remaining))
-            bucket.last_update = utcnow()
-            self._storage.set_token_bucket(self._get_bucket_key(scope), bucket)
+        # One attempt per host per limiter: a miss is far more common than a
+        # hit, and re-deciding it on every request is pure overhead.
+        self._seeded_hosts.add(host)
 
-        logger.debug("Rate limit updated for %s: %s/%s remaining", scope, remaining, limit)
+        profile = seed_limits(host, authenticated=self._authenticated)
+        if not profile:
+            return
+
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        for suffix, limits in profile.items():
+            scope = self._normalize_scope(base + suffix)
+            if self._storage.get_rate_limit(scope) is not None:
+                continue
+
+            for seed in limits:
+                window_td = self._parse_window(seed.window)
+                dimension = LimitDimension(
+                    name=seed.dimension,
+                    limit=seed.limit,
+                    remaining=seed.limit,
+                    reset_time=utcnow() + window_td,
+                    window=window_td,
+                    confidence="registry",
+                )
+                existing = self._storage.get_rate_limit(scope) or RateLimit(
+                    endpoint=scope,
+                    limit=seed.limit,
+                    remaining=seed.limit,
+                    reset_time=dimension.reset_time,
+                    window=window_td,
+                    confidence="registry",
+                )
+                self._storage.set_rate_limit(
+                    scope, existing.with_dimension(dimension)
+                )
+
+            logger.debug("Seeded %s from the %s provider profile", scope, host)
 
     def _apply_default_limits(self, url: str) -> None:
         """Apply configured default limits if nothing governs this URL yet."""
@@ -367,10 +541,17 @@ class LimiterBase:
         """
         status = rate_limit.to_status()
 
-        bucket = self._storage.get_token_bucket(self._get_bucket_key(rate_limit.endpoint))
-        if bucket is not None:
+        for name, dimension in status.dimensions.items():
+            bucket = self._storage.get_token_bucket(
+                self._get_bucket_key(rate_limit.endpoint, name)
+            )
+            if bucket is None:
+                continue
+
             bucket.refill()
-            status.remaining = int(bucket.tokens)
+            dimension.remaining = int(bucket.tokens)
+            if name == REQUESTS:
+                status.remaining = dimension.remaining
 
         return status
 
@@ -402,7 +583,13 @@ class LimiterBase:
         """
         return sorted(self._storage.list_endpoints(), key=lambda k: (-len(k), k))
 
-    def set_limit(self, endpoint: str, limit: int, window: str = "1h") -> None:
+    def set_limit(
+        self,
+        endpoint: str,
+        limit: int,
+        window: str = "1h",
+        dimension: str = REQUESTS,
+    ) -> None:
         """
         Manually set the rate limit for an endpoint scope.
 
@@ -411,8 +598,12 @@ class LimiterBase:
                 prefix — ``'api.example.com'`` applies to the whole host, while
                 ``'api.example.com/search'`` applies only to paths under
                 ``/search`` and takes precedence there.
-            limit: Maximum number of requests
+            limit: Maximum units of ``dimension`` allowed per window.
             window: Time window (e.g., '1h', '1m', '30s', '1d')
+            dimension: What is being metered. Defaults to ``'requests'``. Call
+                again with another name — ``'tokens'``, ``'requests_daily'`` —
+                to add a second budget to the same scope; a request must then
+                satisfy every one of them.
 
         Raises:
             ValueError: If ``window`` is not a whole number plus d/h/m/s.
@@ -420,17 +611,27 @@ class LimiterBase:
         scope = self._normalize_scope(endpoint)
         window_td = self._parse_window(window)
 
-        self._storage.set_rate_limit(
-            scope,
-            RateLimit(
+        new_dimension = LimitDimension(
+            name=dimension,
+            limit=limit,
+            remaining=limit,
+            reset_time=utcnow() + window_td,
+            window=window_td,
+            confidence="configured",
+        )
+
+        existing = self._storage.get_rate_limit(scope)
+        if existing is None:
+            existing = RateLimit(
                 endpoint=scope,
                 limit=limit,
                 remaining=limit,
-                reset_time=utcnow() + window_td,
+                reset_time=new_dimension.reset_time,
                 window=window_td,
                 confidence="configured",
-            ),
-        )
+            )
+
+        self._storage.set_rate_limit(scope, existing.with_dimension(new_dimension))
 
     @staticmethod
     def _parse_window(window: str) -> timedelta:

@@ -111,6 +111,41 @@ See [Which storage backend?](choosing.md) and [Storage Backends](storage.md).
     `redis-py` connects lazily and an unchecked client looks healthy right up
     until it silently stops limiting.
 
+## 6. Dimensions
+
+A scope can meter more than one thing. `requests` is universal; an LLM API also
+meters `tokens`, and the token budget is usually the one that binds — a caller
+well inside its requests-per-minute allowance still gets a 429 once
+tokens-per-minute is spent.
+
+Each dimension has its own budget and its own bucket. A request declares what it
+spends:
+
+```python
+limiter.request("POST", url, json=payload, cost={"tokens": 1500})
+```
+
+and is admitted only when **every** dimension it touches can pay. The charge is
+one atomic step across all of them, which is not a detail: charging them in turn
+would let a request spend its request allowance and then be refused for tokens,
+draining the wrong budget on every rejection. A refused request charges nothing.
+
+A dimension a request does not spend never gates it, so a `GET` with no token
+cost is not held up by an exhausted token budget.
+
+## 7. Provider profiles
+
+Detection needs a response. Some limits matter before you have one — GitHub
+allows 60 requests an hour unauthenticated, and no response tells you whether
+your credentials were accepted until you have already spent a request finding
+out.
+
+For a small set of hosts the library seeds documented limits at construction,
+marked `confidence="registry"` and replaced as soon as real headers arrive. The
+table is deliberately tiny: most providers meter per account tier, so a baked-in
+number would be a guess about *your* account, and those providers send their
+limits in headers anyway. See [Provider profiles](providers.md).
+
 ## What happens on a 429
 
 Even with pacing you can still be handed a 429 — another client on the same key, a limit the API never advertised, a burst that started before the first response taught the limiter anything.

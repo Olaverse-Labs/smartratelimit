@@ -41,6 +41,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README links pointed at a repository path that no longer exists.
 
 ### Added
+- **Multi-dimensional limits with per-request cost.** A scope can now meter more
+  than requests. `set_limit(..., dimension="tokens")` adds a second budget, and
+  `request(..., cost={"tokens": 1500})` says what a call spends; it is admitted
+  only when every dimension it touches can pay. This is the constraint that
+  actually binds on LLM APIs — a caller well inside its requests-per-minute
+  allowance still gets a 429 once tokens-per-minute is spent, and pacing against
+  requests alone paced against the wrong number.
+
+  The charge is **atomic across every bucket**: `StorageBackend.acquire_many()`
+  debits all of them or none. Charging in turn would let a request spend its
+  request allowance and then be refused for tokens, draining the wrong budget on
+  every rejection. Implemented as one lock for memory, one `BEGIN IMMEDIATE`
+  transaction for SQLite, and one multi-key Lua script for Redis. A dimension a
+  request does not spend never gates it.
+
+  OpenAI and Anthropic token headers are detected automatically, as is the
+  generic `X-RateLimit-*-Tokens` convention. The detector previously read only
+  `x-ratelimit-limit-requests` from OpenAI and ignored the token headers
+  entirely.
+- **Provider profiles** for limits detection cannot reach in time.
+  `RateLimiter()` seeds documented limits for known hosts before their first
+  response; `authenticated=True` selects the credentialed numbers, since no
+  response tells you which side you are on before you send one. GitHub's
+  unauthenticated 60-per-hour is the motivating case — low enough that learning
+  it from the first response has already cost a meaningful slice of the budget.
+
+  Seeds carry `confidence="registry"` and are replaced as soon as the API
+  reports its own numbers; an explicitly configured limit still outranks both.
+  Disable with `use_provider_profiles=False`.
+
+  **The built-in table is deliberately tiny and a test enforces that.** Most
+  providers meter per account tier, so a baked-in number is a guess about the
+  caller's account — and a wrong baked-in limit is worse than none. OpenAI,
+  Anthropic and Stripe are excluded for exactly this reason; their limits come
+  from headers. `register_provider()` covers your own services, which is the
+  case the mechanism is really for.
+- `LimitDimension`, and `RateLimitStatus.dimensions` exposing every metered
+  budget. `smartratelimit status`, `list` and `probe` show them.
+- `RateLimitDetector.detect_all()`, returning every dimension a response reports.
 - **Per-path endpoint scopes.** `set_limit("api.example.com/search", limit=10,
   window="1m")` now scopes a limit to a path prefix, with its own token bucket.
   Resolution walks from the full path up to the bare host and uses the narrowest
@@ -74,6 +113,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build.
 
 ### Changed
+- `field(default_factory=datetime.utcnow)` in `models.py` survived the
+  deprecation sweep, which matched only call sites with parentheses. The guard
+  test now matches the bare reference too.
 - Detected headers no longer overwrite a limit you set explicitly. A
   `confidence="configured"` entry stands, because you set it precisely when the
   headers were absent or wrong.

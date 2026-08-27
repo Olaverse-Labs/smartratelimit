@@ -72,6 +72,54 @@ class RateLimitDetector:
             "remaining": "x-ratelimit-remaining-requests",
             "reset": "x-ratelimit-reset-requests",
         },
+        "api.anthropic.com": {
+            "limit": "anthropic-ratelimit-requests-limit",
+            "remaining": "anthropic-ratelimit-requests-remaining",
+            "reset": "anthropic-ratelimit-requests-reset",
+        },
+    }
+
+    #: Extra metered dimensions, beyond requests, for APIs that report them.
+    #:
+    #: For an LLM API the binding constraint is usually tokens per minute rather
+    #: than requests per minute: a caller well inside its request budget still
+    #: gets a 429 when the token budget is spent. Reading only the requests
+    #: headers makes the limiter confidently pace against the wrong number.
+    API_DIMENSIONS = {
+        "api.openai.com": {
+            "tokens": {
+                "limit": "x-ratelimit-limit-tokens",
+                "remaining": "x-ratelimit-remaining-tokens",
+                "reset": "x-ratelimit-reset-tokens",
+            },
+        },
+        "api.anthropic.com": {
+            "tokens": {
+                "limit": "anthropic-ratelimit-tokens-limit",
+                "remaining": "anthropic-ratelimit-tokens-remaining",
+                "reset": "anthropic-ratelimit-tokens-reset",
+            },
+            "input_tokens": {
+                "limit": "anthropic-ratelimit-input-tokens-limit",
+                "remaining": "anthropic-ratelimit-input-tokens-remaining",
+                "reset": "anthropic-ratelimit-input-tokens-reset",
+            },
+            "output_tokens": {
+                "limit": "anthropic-ratelimit-output-tokens-limit",
+                "remaining": "anthropic-ratelimit-output-tokens-remaining",
+                "reset": "anthropic-ratelimit-output-tokens-reset",
+            },
+        },
+    }
+
+    #: Header profiles for extra dimensions, tried on every host. Providers that
+    #: follow the ``*-tokens`` convention are picked up without a named profile.
+    GENERIC_DIMENSIONS = {
+        "tokens": {
+            "limit": "X-RateLimit-Limit-Tokens",
+            "remaining": "X-RateLimit-Remaining-Tokens",
+            "reset": "X-RateLimit-Reset-Tokens",
+        },
     }
 
     #: Window assumed when a response advertises a limit but no reset time.
@@ -188,6 +236,41 @@ class RateLimitDetector:
                     }
 
         return None
+
+    def detect_all(self, url: str, status_code: int, headers) -> list:
+        """
+        Detect every metered dimension a response reports.
+
+        Args:
+            url: The request URL, used to pick API-specific header profiles.
+            status_code: HTTP status; 429 unlocks the ``Retry-After`` fallback.
+            headers: Response headers (any case-insensitive mapping).
+
+        Returns:
+            A list of detection dicts, each carrying a ``dimension`` key. The
+            ``requests`` dimension, when found, comes first. Empty if nothing
+            was detected.
+        """
+        headers = self._as_case_insensitive(headers)
+        domain = urlparse(url).netloc.lower()
+
+        detections = []
+
+        primary = self.detect(url, status_code, headers)
+        if primary:
+            primary.setdefault("dimension", "requests")
+            detections.append(primary)
+
+        profiles = dict(self.GENERIC_DIMENSIONS)
+        profiles.update(self.API_DIMENSIONS.get(domain, {}))
+
+        for name, pattern in profiles.items():
+            extra = self._extract_with_pattern(headers, pattern, domain)
+            if extra:
+                extra["dimension"] = name
+                detections.append(extra)
+
+        return detections
 
     @staticmethod
     def _as_case_insensitive(headers):

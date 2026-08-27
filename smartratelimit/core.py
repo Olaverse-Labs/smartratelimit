@@ -12,6 +12,7 @@ from smartratelimit._base import (  # noqa: F401  (re-exported for callers)
     RateLimitExceeded,
     StorageUnavailable,
 )
+from smartratelimit.models import REQUESTS
 from smartratelimit.retry import RetryConfig
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,8 @@ class RateLimiter(LimiterBase):
         raise_on_limit: bool = False,
         retry: Optional[RetryConfig] = None,
         fail_closed: bool = False,
+        use_provider_profiles: bool = True,
+        authenticated: bool = False,
     ):
         """
         Initialize rate limiter.
@@ -68,6 +71,13 @@ class RateLimiter(LimiterBase):
                 Defaults to three attempts with jittered exponential backoff.
             fail_closed: If True, raise when shared storage is unreachable
                 instead of silently falling back to per-process limits.
+            use_provider_profiles: Seed documented limits for known hosts before
+                their first response. Seeds are marked ``confidence='registry'``
+                and replaced as soon as the API reports its own numbers.
+            authenticated: Whether requests carry credentials. Documented limits
+                often differ by orders of magnitude between anonymous and
+                authenticated callers, and no response says which you are before
+                you send one.
         """
         super().__init__(
             storage=storage,
@@ -76,38 +86,53 @@ class RateLimiter(LimiterBase):
             raise_on_limit=raise_on_limit,
             retry=retry,
             fail_closed=fail_closed,
+            use_provider_profiles=use_provider_profiles,
+            authenticated=authenticated,
         )
         self._session = requests.Session()
 
-    def _acquire(self, scope: str, limit: int, window: timedelta) -> None:
+    def _acquire(self, scope: str, limit: int, window: timedelta, cost=None) -> None:
         """
-        Block until a token for ``scope`` has been consumed, or raise.
+        Block until this request's budget has been consumed, or raise.
 
-        Consumption happens inside the storage backend as one atomic step, so
-        the count is correct across threads, processes and hosts. Reading a
-        bucket here, deducting a token locally and writing it back would lose
-        updates -- and with SQLite or Redis it would also lose the deduction
-        entirely, since those backends hand back a fresh object each read.
-
-        Args:
-            scope: Endpoint scope key governing this request.
-            limit: Requests allowed per window.
-            window: Length of the window.
-
-        Raises:
-            RateLimitExceeded: If ``raise_on_limit`` is set and no token is
-                available, or if the bucket can never refill.
+        Kept for callers holding a single limit and window. The request path
+        uses :meth:`_acquire_limit`, which honours every dimension of a scope.
         """
         window_seconds = window.total_seconds() if window else 0.0
         if limit <= 0 or window_seconds <= 0:
             return
 
         capacity = float(limit)
-        refill_rate = capacity / window_seconds
-        key = self._get_bucket_key(scope)
+        amount = self._normalize_cost(cost)[REQUESTS]
+        self._spend(
+            scope,
+            [(self._get_bucket_key(scope), capacity, capacity / window_seconds, amount)],
+        )
 
+    def _acquire_limit(self, rate_limit, cost=None) -> None:
+        """Block until every dimension this request spends has been charged."""
+        specs = self._acquire_specs(rate_limit, cost)
+        if specs:
+            self._spend(rate_limit.endpoint, specs)
+
+    def _spend(self, scope: str, specs) -> None:
+        """
+        Charge the buckets in ``specs``, waiting for capacity if needed.
+
+        Consumption happens inside the storage backend as one atomic step --
+        across every bucket at once when there is more than one, so a request
+        never spends its request budget only to be refused for tokens.
+
+        Args:
+            scope: Endpoint scope key, for messages and logs.
+            specs: ``(key, capacity, refill_rate, tokens)`` per bucket.
+
+        Raises:
+            RateLimitExceeded: If ``raise_on_limit`` is set and the budget is
+                not available, or if a bucket can never refill.
+        """
         for _ in range(self.MAX_WAIT_ATTEMPTS):
-            allowed, wait_time = self._storage.acquire(key, capacity, refill_rate)
+            allowed, wait_time = self._storage.acquire_many(specs)
             if allowed:
                 return
 
@@ -125,22 +150,26 @@ class RateLimiter(LimiterBase):
             logger.info(
                 "Rate limit reached for %s, waiting %.2f seconds", scope, wait_time
             )
-            # Another worker may take the token we waited for, so loop rather
+            # Another worker may take the capacity we waited for, so loop rather
             # than assuming one wait is enough.
             time.sleep(max(wait_time, 0.001))
 
         raise RateLimitExceeded(
-            f"Could not acquire a token for {scope} after "
+            f"Could not acquire capacity for {scope} after "
             f"{self.MAX_WAIT_ATTEMPTS} attempts; the endpoint is saturated."
         )
 
-    def request(self, method: str, url: str, **kwargs) -> requests.Response:
+    def request(self, method: str, url: str, cost=None, **kwargs) -> requests.Response:
         """
         Make a rate-limited HTTP request.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, PATCH)
             url: Request URL
+            cost: What this request spends. Omit for one request. Pass a mapping
+                to charge other metered dimensions too — ``cost={'tokens': 1500}``
+                for an LLM call — and the request waits until every budget it
+                touches can pay.
             **kwargs: Additional arguments passed to requests.request()
 
         Returns:
@@ -149,9 +178,9 @@ class RateLimiter(LimiterBase):
         Raises:
             RateLimitExceeded: If raise_on_limit=True and limit is exceeded
         """
-        return self._request(method, url, self._session, **kwargs)
+        return self._request(method, url, self._session, cost=cost, **kwargs)
 
-    def _request(self, method: str, url: str, session, **kwargs) -> requests.Response:
+    def _request(self, method: str, url: str, session, cost=None, **kwargs) -> requests.Response:
         """
         Rate-limit and issue a request on a specific transport.
 
@@ -166,13 +195,14 @@ class RateLimiter(LimiterBase):
         max_attempts = self._retry.max_attempts()
 
         for attempt in range(1, max_attempts + 1):
-            # Defaults are (re)applied each attempt because a 429 may have
-            # taught us a real limit in the meantime.
+            # Both are (re)applied each attempt because a 429 may have taught
+            # us a real limit in the meantime.
+            self._apply_provider_profile(url)
             self._apply_default_limits(url)
 
             rate_limit = self._resolve_limit(url)
-            if rate_limit and rate_limit.limit:
-                self._acquire(rate_limit.endpoint, rate_limit.limit, rate_limit.window)
+            if rate_limit:
+                self._acquire_limit(rate_limit, cost)
 
             response = session.request(method, url, **kwargs)
             self._record_response(url, response.status_code, response.headers)
@@ -226,10 +256,10 @@ class RateLimiter(LimiterBase):
 
         transport = _OriginalRequestSession(session.request)
 
-        def rate_limited_request(method, url, **kwargs):
+        def rate_limited_request(method, url, cost=None, **kwargs):
             # Route through the limiter, but let it issue the call on this
             # session rather than on the limiter's own.
-            return self._request(method, url, transport, **kwargs)
+            return self._request(method, url, transport, cost=cost, **kwargs)
 
         session.request = rate_limited_request
         session._smartratelimit_wrapped = True

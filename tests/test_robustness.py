@@ -139,7 +139,9 @@ class TestNoDeprecatedClock:
             if path.name == "_time.py":
                 continue  # documents them in its docstring
             text = path.read_text()
-            if "datetime.utcnow()" in text or "datetime.utcfromtimestamp(" in text:
+            # No parentheses in the pattern: `field(default_factory=datetime.utcnow)`
+            # passes the function itself, and a paren-anchored check misses it.
+            if "datetime.utcnow" in text or "datetime.utcfromtimestamp" in text:
                 offenders.append(path.name)
 
         assert offenders == []

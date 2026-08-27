@@ -33,6 +33,18 @@ def cmd_status(args):
                 print(f"  Resets in: {status.reset_in:.0f} seconds")
             print(f"  Exceeded: {status.is_exceeded}")
             print(f"  Confidence: {status.confidence}")
+
+            # A caller metered on tokens as well as requests needs to see both;
+            # showing only requests hides the budget that usually binds first.
+            extra = [d for n, d in status.dimensions.items() if n != "requests"]
+            if extra:
+                print("  Other metered dimensions:")
+                for dimension in extra:
+                    print(
+                        f"    {dimension.name}: "
+                        f"{dimension.remaining}/{dimension.limit} remaining, "
+                        f"window {dimension.window}, {dimension.confidence}"
+                    )
             if status.confidence == "estimated":
                 print(
                     "  Note: the API reported a limit but no reset time, so the "
@@ -74,6 +86,13 @@ def cmd_probe(args):
             "RateLimit-Limit",
             "RateLimit-Remaining",
             "RateLimit-Reset",
+            "X-RateLimit-Limit-Tokens",
+            "X-RateLimit-Remaining-Tokens",
+            "X-RateLimit-Reset-Tokens",
+            "x-ratelimit-limit-tokens",
+            "x-ratelimit-remaining-tokens",
+            "anthropic-ratelimit-tokens-limit",
+            "anthropic-ratelimit-tokens-remaining",
             "Retry-After",
         ]:
             if header in response.headers:
@@ -86,6 +105,13 @@ def cmd_probe(args):
             print(f"  Remaining: {status.remaining}")
             print(f"  Window: {status.window}")
             print(f"  Confidence: {status.confidence}")
+            for name, dimension in status.dimensions.items():
+                if name == "requests":
+                    continue
+                print(
+                    f"  Also metered — {name}: {dimension.limit} "
+                    f"per {dimension.window} ({dimension.confidence})"
+                )
             if status.confidence == "estimated":
                 print(
                     "  Note: no usable reset header, so the window above is an "
@@ -119,6 +145,14 @@ def cmd_list(args):
                 f"      {status.remaining}/{status.limit} remaining, "
                 f"window {status.window}, {status.confidence}"
             )
+            for name, dimension in status.dimensions.items():
+                if name == "requests":
+                    continue
+                print(
+                    f"      {name}: "
+                    f"{dimension.remaining}/{dimension.limit} remaining, "
+                    f"window {dimension.window}, {dimension.confidence}"
+                )
         else:
             print(f"  {endpoint}")
 

@@ -6,6 +6,7 @@ from datetime import timedelta
 from typing import Dict, Optional
 
 from smartratelimit._base import LimiterBase, RateLimitExceeded
+from smartratelimit.models import REQUESTS
 from smartratelimit.retry import RetryConfig
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,8 @@ class AsyncRateLimiter(LimiterBase):
         raise_on_limit: bool = False,
         retry: Optional[RetryConfig] = None,
         fail_closed: bool = False,
+        use_provider_profiles: bool = True,
+        authenticated: bool = False,
     ):
         """
         Initialize async rate limiter.
@@ -77,6 +80,13 @@ class AsyncRateLimiter(LimiterBase):
                 Defaults to three attempts with jittered exponential backoff.
             fail_closed: If True, raise when shared storage is unreachable
                 instead of silently falling back to per-process limits.
+            use_provider_profiles: Seed documented limits for known hosts before
+                their first response. Seeds are marked ``confidence='registry'``
+                and replaced as soon as the API reports its own numbers.
+            authenticated: Whether requests carry credentials. Documented limits
+                often differ by orders of magnitude between anonymous and
+                authenticated callers, and no response says which you are before
+                you send one.
         """
         super().__init__(
             storage=storage,
@@ -85,6 +95,8 @@ class AsyncRateLimiter(LimiterBase):
             raise_on_limit=raise_on_limit,
             retry=retry,
             fail_closed=fail_closed,
+            use_provider_profiles=use_provider_profiles,
+            authenticated=authenticated,
         )
 
     async def __aenter__(self):
@@ -95,21 +107,39 @@ class AsyncRateLimiter(LimiterBase):
         """Async context manager exit."""
         pass
 
-    async def _acquire(self, scope: str, limit: int, window: timedelta) -> None:
+    async def _acquire(self, scope: str, limit: int, window: timedelta, cost=None) -> None:
         """
         Await a token for ``scope``, or raise.
 
-        Mirrors :meth:`RateLimiter._acquire`: consumption happens atomically
-        inside the storage backend, so concurrent tasks, processes and hosts
-        share one honest count.
+        Kept for callers holding a single limit and window; the request path
+        uses :meth:`_acquire_limit`, which honours every dimension of a scope.
         """
         window_seconds = window.total_seconds() if window else 0.0
         if limit <= 0 or window_seconds <= 0:
             return
 
         capacity = float(limit)
-        refill_rate = capacity / window_seconds
-        key = self._get_bucket_key(scope)
+        amount = self._normalize_cost(cost)[REQUESTS]
+        await self._spend(
+            scope,
+            [(self._get_bucket_key(scope), capacity, capacity / window_seconds, amount)],
+        )
+
+    async def _acquire_limit(self, rate_limit, cost=None) -> None:
+        """Await capacity for every dimension this request spends."""
+        specs = self._acquire_specs(rate_limit, cost)
+        if specs:
+            await self._spend(rate_limit.endpoint, specs)
+
+    async def _spend(self, scope: str, specs) -> None:
+        """
+        Charge the buckets in ``specs``, awaiting capacity if needed.
+
+        Mirrors :meth:`RateLimiter._spend`: consumption happens atomically
+        inside the storage backend -- across every bucket at once when there is
+        more than one -- so concurrent tasks, processes and hosts share one
+        honest count and a request never half-spends its budget.
+        """
         loop = asyncio.get_running_loop()
 
         for _ in range(self.MAX_WAIT_ATTEMPTS):
@@ -119,7 +149,7 @@ class AsyncRateLimiter(LimiterBase):
             # it goes, so one worker's contention does not stall every other
             # coroutine in the process.
             allowed, wait_time = await loop.run_in_executor(
-                None, self._storage.acquire, key, capacity, refill_rate
+                None, self._storage.acquire_many, specs
             )
             if allowed:
                 return
@@ -141,17 +171,18 @@ class AsyncRateLimiter(LimiterBase):
             await asyncio.sleep(max(wait_time, 0.001))
 
         raise RateLimitExceeded(
-            f"Could not acquire a token for {scope} after "
+            f"Could not acquire capacity for {scope} after "
             f"{self.MAX_WAIT_ATTEMPTS} attempts; the endpoint is saturated."
         )
 
-    async def _pace(self, url: str) -> None:
-        """Apply defaults, resolve the governing scope, and wait for a token."""
+    async def _pace(self, url: str, cost=None) -> None:
+        """Seed, apply defaults, resolve the governing scope, and wait."""
+        self._apply_provider_profile(url)
         self._apply_default_limits(url)
 
         rate_limit = self._resolve_limit(url)
-        if rate_limit and rate_limit.limit:
-            await self._acquire(rate_limit.endpoint, rate_limit.limit, rate_limit.window)
+        if rate_limit:
+            await self._acquire_limit(rate_limit, cost)
 
     def _should_give_up(self, status_code: int, attempt: int, max_attempts: int, url: str):
         """
@@ -190,7 +221,7 @@ class AsyncRateLimiter(LimiterBase):
         )
         await asyncio.sleep(wait_time)
 
-    async def arequest_httpx(self, client, method: str, url: str, **kwargs):
+    async def arequest_httpx(self, client, method: str, url: str, cost=None, **kwargs):
         """
         Make a rate-limited async HTTP request using httpx.
 
@@ -198,6 +229,9 @@ class AsyncRateLimiter(LimiterBase):
             client: httpx.AsyncClient instance
             method: HTTP method (GET, POST, PUT, DELETE, PATCH)
             url: Request URL
+            cost: What this request spends. Omit for one request, or pass a
+                mapping such as ``{'tokens': 1500}`` to charge other metered
+                dimensions too.
             **kwargs: Additional arguments passed to client.request()
 
         Returns:
@@ -206,7 +240,7 @@ class AsyncRateLimiter(LimiterBase):
         max_attempts = self._retry.max_attempts()
 
         for attempt in range(1, max_attempts + 1):
-            await self._pace(url)
+            await self._pace(url, cost)
 
             response = await client.request(method, url, **kwargs)
             self._record_response(url, response.status_code, response.headers)
@@ -220,7 +254,7 @@ class AsyncRateLimiter(LimiterBase):
 
         return response
 
-    async def arequest_aiohttp(self, session, method: str, url: str, **kwargs):
+    async def arequest_aiohttp(self, session, method: str, url: str, cost=None, **kwargs):
         """
         Make a rate-limited async HTTP request using aiohttp.
 
@@ -228,6 +262,9 @@ class AsyncRateLimiter(LimiterBase):
             session: aiohttp.ClientSession instance
             method: HTTP method (GET, POST, PUT, DELETE, PATCH)
             url: Request URL
+            cost: What this request spends. Omit for one request, or pass a
+                mapping such as ``{'tokens': 1500}`` to charge other metered
+                dimensions too.
             **kwargs: Additional arguments passed to session.request()
 
         Returns:
@@ -237,7 +274,7 @@ class AsyncRateLimiter(LimiterBase):
         max_attempts = self._retry.max_attempts()
 
         for attempt in range(1, max_attempts + 1):
-            await self._pace(url)
+            await self._pace(url, cost)
 
             async with session.request(method, url, **kwargs) as response:
                 # The body has to be read before the connection is released, so

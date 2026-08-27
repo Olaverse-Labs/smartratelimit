@@ -1,5 +1,6 @@
 """Storage backends for rate limit state."""
 
+import json
 import logging
 import sqlite3
 import threading
@@ -11,9 +12,62 @@ from urllib.parse import urlparse
 from smartratelimit._time import to_epoch as _to_epoch
 from smartratelimit._time import utcfromtimestamp as _from_epoch
 from smartratelimit._time import utcnow
-from smartratelimit.models import RateLimit, TokenBucket
+from smartratelimit.models import LimitDimension, RateLimit, TokenBucket
 
 logger = logging.getLogger(__name__)
+
+
+def _dimensions_to_json(rate_limit: RateLimit) -> str:
+    """Serialise the non-``requests`` dimensions of a limit.
+
+    Kept out of the row/hash columns so that rows written by earlier versions,
+    which only ever had one dimension, still load unchanged.
+    """
+    if not rate_limit.dimensions:
+        return ""
+
+    return json.dumps(
+        {
+            d.name: {
+                "limit": d.limit,
+                "remaining": d.remaining,
+                "reset_time": d.reset_time.isoformat(),
+                "window_seconds": d.window.total_seconds(),
+                "confidence": d.confidence,
+            }
+            for d in rate_limit.dimensions.values()
+        }
+    )
+
+
+def _dimensions_from_json(blob) -> Dict[str, LimitDimension]:
+    """Load extra dimensions, tolerating rows that predate them."""
+    if not blob:
+        return {}
+
+    if isinstance(blob, bytes):
+        blob = blob.decode("utf-8")
+
+    try:
+        raw = json.loads(blob)
+    except (ValueError, TypeError):
+        logger.debug("Ignoring unreadable dimension payload: %r", blob)
+        return {}
+
+    dimensions = {}
+    for name, d in raw.items():
+        try:
+            dimensions[name] = LimitDimension(
+                name=name,
+                limit=int(d["limit"]),
+                remaining=int(d["remaining"]),
+                reset_time=datetime.fromisoformat(d["reset_time"]),
+                window=timedelta(seconds=float(d["window_seconds"])),
+                confidence=d.get("confidence", "confirmed"),
+            )
+        except (KeyError, ValueError, TypeError) as e:
+            logger.debug("Skipping malformed dimension %r: %s", name, e)
+    return dimensions
 
 
 def _covers(scope: str, key: str) -> bool:
@@ -59,6 +113,34 @@ class StorageBackend(ABC):
     def list_endpoints(self) -> List[str]:
         """List every endpoint key that currently has a stored rate limit."""
         pass
+
+    def acquire_many(
+        self, specs: List[Tuple[str, float, float, float]]
+    ) -> Tuple[bool, float]:
+        """
+        Acquire from several buckets at once, all or nothing.
+
+        A request metered on more than one dimension -- requests *and* tokens,
+        say -- has to satisfy every one of them. Acquiring them one at a time
+        leaks: the request budget is spent, the token budget refuses, and the
+        request never goes out. Either every bucket is charged or none is.
+
+        Args:
+            specs: One ``(key, capacity, refill_rate, tokens)`` per bucket.
+
+        Returns:
+            ``(allowed, wait_time)``. On refusal nothing has been consumed and
+            ``wait_time`` is the longest wait among the buckets that refused.
+        """
+        if len(specs) == 1:
+            key, capacity, refill_rate, tokens = specs[0]
+            return self.acquire(key, capacity, refill_rate, tokens)
+
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement acquire_many(), so it "
+            f"cannot serve limits with more than one dimension. Implement it "
+            f"so that all buckets are charged in one atomic step."
+        )
 
     def get_rate_limit_for(self, candidates: List[str]) -> Optional[RateLimit]:
         """
@@ -192,6 +274,42 @@ class MemoryStorage(StorageBackend):
         with self._lock:
             return list(self._rate_limits.keys())
 
+    def acquire_many(
+        self, specs: List[Tuple[str, float, float, float]]
+    ) -> Tuple[bool, float]:
+        """Check every bucket, then charge them, all under one lock."""
+        with self._lock:
+            now = utcnow()
+            buckets = []
+            wait = 0.0
+            allowed = True
+
+            for key, capacity, refill_rate, tokens in specs:
+                bucket = self._token_buckets.get(key)
+                if bucket is None:
+                    bucket = TokenBucket(
+                        capacity=capacity, tokens=capacity, refill_rate=refill_rate
+                    )
+                    self._token_buckets[key] = bucket
+                else:
+                    bucket.capacity = capacity
+                    bucket.refill_rate = refill_rate
+                    bucket.tokens = min(bucket.tokens, capacity)
+
+                bucket.refill(now)
+                if bucket.tokens < tokens:
+                    allowed = False
+                    wait = max(wait, bucket.wait_time(tokens, now=now))
+                buckets.append((bucket, tokens))
+
+            if not allowed:
+                # Charge nothing: a partial deduction is a leaked budget.
+                return False, wait
+
+            for bucket, tokens in buckets:
+                bucket.tokens -= tokens
+            return True, 0.0
+
     def acquire(
         self,
         key: str,
@@ -280,12 +398,13 @@ class SQLiteStorage(StorageBackend):
                     reset_time TEXT NOT NULL,
                     window_seconds REAL NOT NULL,
                     last_updated TEXT NOT NULL,
-                    confidence TEXT NOT NULL DEFAULT 'confirmed'
+                    confidence TEXT NOT NULL DEFAULT 'confirmed',
+                    dimensions TEXT NOT NULL DEFAULT ''
                 )
             """
             )
-            # Databases written before confidence tracking existed keep working;
-            # their rows read back as 'confirmed'.
+            # Databases written before these columns existed keep working;
+            # their rows read back as a single 'confirmed' requests dimension.
             columns = {
                 row[1] for row in conn.execute("PRAGMA table_info(rate_limits)")
             }
@@ -293,6 +412,11 @@ class SQLiteStorage(StorageBackend):
                 conn.execute(
                     "ALTER TABLE rate_limits "
                     "ADD COLUMN confidence TEXT NOT NULL DEFAULT 'confirmed'"
+                )
+            if "dimensions" not in columns:
+                conn.execute(
+                    "ALTER TABLE rate_limits "
+                    "ADD COLUMN dimensions TEXT NOT NULL DEFAULT ''"
                 )
             conn.execute(
                 """
@@ -345,6 +469,7 @@ class SQLiteStorage(StorageBackend):
                     window=timedelta(seconds=row["window_seconds"]),
                     last_updated=self._str_to_datetime(row["last_updated"]),
                     confidence=row["confidence"],
+                    dimensions=_dimensions_from_json(row["dimensions"]),
                 )
             finally:
                 if self._conn is None:
@@ -359,8 +484,8 @@ class SQLiteStorage(StorageBackend):
                     """
                     INSERT OR REPLACE INTO rate_limits
                     (endpoint, limit_value, remaining, reset_time, window_seconds,
-                     last_updated, confidence)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                     last_updated, confidence, dimensions)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         endpoint,
@@ -370,6 +495,7 @@ class SQLiteStorage(StorageBackend):
                         rate_limit.window.total_seconds(),
                         self._datetime_to_str(rate_limit.last_updated),
                         rate_limit.confidence,
+                        _dimensions_to_json(rate_limit),
                     ),
                 )
                 conn.commit()
@@ -491,8 +617,85 @@ class SQLiteStorage(StorageBackend):
                     window=timedelta(seconds=row["window_seconds"]),
                     last_updated=self._str_to_datetime(row["last_updated"]),
                     confidence=row["confidence"],
+                    dimensions=_dimensions_from_json(row["dimensions"]),
                 )
         return None
+
+    def acquire_many(
+        self, specs: List[Tuple[str, float, float, float]]
+    ) -> Tuple[bool, float]:
+        """Charge every bucket inside one write transaction, or none of them."""
+        if len(specs) == 1:
+            key, capacity, refill_rate, tokens = specs[0]
+            return self.acquire(key, capacity, refill_rate, tokens)
+
+        with self._lock:
+            conn = self._get_connection()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    now = utcnow()
+                    keys = [spec[0] for spec in specs]
+                    placeholders = ",".join("?" for _ in keys)
+                    rows = {
+                        row[0]: (float(row[1]), self._str_to_datetime(row[2]))
+                        for row in conn.execute(
+                            f"SELECT key, tokens, last_update FROM token_buckets "
+                            f"WHERE key IN ({placeholders})",
+                            tuple(keys),
+                        )
+                    }
+
+                    buckets = []
+                    allowed = True
+                    wait = 0.0
+
+                    for key, capacity, refill_rate, tokens in specs:
+                        stored = rows.get(key)
+                        bucket = TokenBucket(
+                            capacity=capacity,
+                            tokens=capacity if stored is None else min(stored[0], capacity),
+                            refill_rate=refill_rate,
+                            last_update=now if stored is None else stored[1],
+                        )
+                        bucket.refill(now)
+                        if bucket.tokens < tokens:
+                            allowed = False
+                            wait = max(wait, bucket.wait_time(tokens, now=now))
+                        buckets.append((key, bucket, tokens))
+
+                    if allowed:
+                        for _, bucket, tokens in buckets:
+                            bucket.tokens -= tokens
+
+                    # Refilled state is worth persisting either way; the
+                    # deduction above is what all-or-nothing governs.
+                    conn.executemany(
+                        """
+                        INSERT OR REPLACE INTO token_buckets
+                        (key, capacity, tokens, refill_rate, last_update)
+                        VALUES (?, ?, ?, ?, ?)
+                    """,
+                        [
+                            (
+                                key,
+                                bucket.capacity,
+                                bucket.tokens,
+                                bucket.refill_rate,
+                                self._datetime_to_str(bucket.last_update),
+                            )
+                            for key, bucket, _ in buckets
+                        ],
+                    )
+                    conn.execute("COMMIT")
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
+
+                return allowed, 0.0 if allowed else wait
+            finally:
+                if self._conn is None:
+                    conn.close()
 
     def acquire(
         self,
@@ -627,6 +830,89 @@ class RedisStorage(StorageBackend):
     return {allowed, tostring(wait)}
     """
 
+    #: All-or-nothing acquire across several buckets.
+    #:
+    #: Two passes inside one script: refill and check every bucket, then charge
+    #: them only if all of them can pay. Charging as you go would leak -- the
+    #: request budget spent on a request the token budget then refuses.
+    #:
+    #: ARGV is a flat triple per key: capacity, refill_rate, cost. The final
+    #: ARGV entry is the TTL.
+    _ACQUIRE_MANY_LUA = """
+    local n = #KEYS
+    local ttl = tonumber(ARGV[#ARGV])
+
+    local time = redis.call('TIME')
+    local now = tonumber(time[1]) + (tonumber(time[2]) / 1000000)
+
+    local tokens = {}
+    local last_updates = {}
+    local allowed = 1
+    local wait = 0
+
+    for i = 1, n do
+        local capacity = tonumber(ARGV[(i - 1) * 3 + 1])
+        local refill_rate = tonumber(ARGV[(i - 1) * 3 + 2])
+        local cost = tonumber(ARGV[(i - 1) * 3 + 3])
+
+        local state = redis.call('HMGET', KEYS[i], 'tokens', 'last_update')
+        local available = tonumber(state[1])
+        local last_update = tonumber(state[2])
+
+        if available == nil or last_update == nil then
+            available = capacity
+            last_update = now
+        end
+
+        if available > capacity then
+            available = capacity
+        end
+
+        local elapsed = now - last_update
+        if elapsed > 0 then
+            available = math.min(capacity, available + (elapsed * refill_rate))
+            last_update = now
+        end
+
+        if available < cost then
+            allowed = 0
+            local this_wait
+            if refill_rate > 0 then
+                this_wait = (cost - available) / refill_rate
+            else
+                this_wait = -1
+            end
+            if this_wait < 0 or wait < 0 then
+                wait = -1
+            elseif this_wait > wait then
+                wait = this_wait
+            end
+        end
+
+        tokens[i] = available
+        last_updates[i] = last_update
+    end
+
+    for i = 1, n do
+        local capacity = tonumber(ARGV[(i - 1) * 3 + 1])
+        local refill_rate = tonumber(ARGV[(i - 1) * 3 + 2])
+        local cost = tonumber(ARGV[(i - 1) * 3 + 3])
+
+        if allowed == 1 then
+            tokens[i] = tokens[i] - cost
+        end
+
+        redis.call('HSET', KEYS[i],
+            'capacity', capacity,
+            'tokens', tokens[i],
+            'refill_rate', refill_rate,
+            'last_update', last_updates[i])
+        redis.call('EXPIRE', KEYS[i], ttl)
+    end
+
+    return {allowed, tostring(wait)}
+    """
+
     def __init__(
         self,
         redis_url: str = "redis://localhost:6379/0",
@@ -661,6 +947,9 @@ class RedisStorage(StorageBackend):
         self.fail_closed = fail_closed
         self._lock = threading.RLock()
         self._acquire_script = self.redis_client.register_script(self._ACQUIRE_LUA)
+        self._acquire_many_script = self.redis_client.register_script(
+            self._ACQUIRE_MANY_LUA
+        )
 
         # redis-py connects lazily, so without this a dead Redis looks healthy
         # until the first request -- and then quietly stops limiting. Check now
@@ -722,6 +1011,7 @@ class RedisStorage(StorageBackend):
                     window=timedelta(seconds=float(data[b"window_seconds"])),
                     last_updated=self._str_to_datetime(data[b"last_updated"]),
                     confidence=data.get(b"confidence", b"confirmed").decode("utf-8"),
+                    dimensions=_dimensions_from_json(data.get(b"dimensions")),
                 )
             except Exception as e:
                 logger.debug("Redis read failed (%s); treating as no stored value", e)
@@ -739,6 +1029,7 @@ class RedisStorage(StorageBackend):
                     b"window_seconds": str(rate_limit.window.total_seconds()).encode("utf-8"),
                     b"last_updated": self._datetime_to_str(rate_limit.last_updated).encode("utf-8"),
                     b"confidence": rate_limit.confidence.encode("utf-8"),
+                    b"dimensions": _dimensions_to_json(rate_limit).encode("utf-8"),
                 }
                 self.redis_client.hset(key, mapping=data)
                 # Set expiration to window + 1 hour for cleanup
@@ -847,10 +1138,51 @@ class RedisStorage(StorageBackend):
                     window=timedelta(seconds=float(data[b"window_seconds"])),
                     last_updated=self._str_to_datetime(data[b"last_updated"]),
                     confidence=data.get(b"confidence", b"confirmed").decode("utf-8"),
+                    dimensions=_dimensions_from_json(data.get(b"dimensions")),
                 )
             except (KeyError, ValueError) as e:
                 logger.debug("Skipping malformed rate limit for %s: %s", key, e)
         return None
+
+    def acquire_many(
+        self, specs: List[Tuple[str, float, float, float]]
+    ) -> Tuple[bool, float]:
+        """Charge every bucket in one Lua script, or none of them."""
+        if len(specs) == 1:
+            key, capacity, refill_rate, tokens = specs[0]
+            return self.acquire(key, capacity, refill_rate, tokens)
+
+        keys = [self._make_key(f"token_bucket:{spec[0]}") for spec in specs]
+        args = []
+        ttl = 86400
+        for _, capacity, refill_rate, tokens in specs:
+            args.extend([capacity, refill_rate, tokens])
+            if refill_rate > 0:
+                ttl = max(ttl, int((capacity / refill_rate) * 2))
+        args.append(ttl)
+
+        try:
+            allowed, wait = self._acquire_many_script(keys=keys, args=args)
+        except Exception as e:
+            if self.fail_closed:
+                from smartratelimit._base import StorageUnavailable
+
+                raise StorageUnavailable(
+                    f"Redis is unavailable and fail_closed=True, so "
+                    f"{[spec[0] for spec in specs]} cannot be paced: {e}"
+                ) from e
+
+            logger.warning(
+                "Redis unavailable (%s) -- allowing request unpaced. "
+                "Pass fail_closed=True to raise instead.",
+                e,
+            )
+            return True, 0.0
+
+        wait_seconds = float(wait)
+        if wait_seconds < 0:
+            wait_seconds = float("inf")
+        return bool(allowed), 0.0 if allowed else wait_seconds
 
     def acquire(
         self,

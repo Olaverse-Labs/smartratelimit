@@ -2,8 +2,12 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Dict, Iterator, Optional
+
 from smartratelimit._time import utcnow
+
+#: The dimension every API limits: one unit spent per request.
+REQUESTS = "requests"
 
 
 @dataclass
@@ -16,7 +20,10 @@ class RateLimitStatus:
     reset_time: Optional[datetime] = None
     window: Optional[timedelta] = None
     confidence: str = "confirmed"
-    """How this limit was arrived at.
+    dimensions: Dict[str, "LimitDimension"] = field(default_factory=dict)
+    """Every metered dimension keyed by name, including ``requests``."""
+
+    _CONFIDENCE_DOC = """How ``confidence`` is arrived at.
 
     ``'confirmed'``  the API reported both the limit and its window.
     ``'estimated'``  the API reported a limit but no usable reset, so the
@@ -24,6 +31,8 @@ class RateLimitStatus:
                      magnitude. Configure the real limit with
                      :meth:`RateLimiter.set_limit` if it matters.
     ``'configured'`` set explicitly by the caller.
+    ``'registry'``   seeded from a built-in provider profile, and replaced as
+                     soon as the API reports its own numbers.
     """
 
     @property
@@ -48,16 +57,89 @@ class RateLimitStatus:
 
 
 @dataclass
+class LimitDimension:
+    """
+    One axis of a rate limit.
+
+    Most APIs meter more than requests. OpenAI's binding constraint is usually
+    tokens per minute, not requests per minute, and both apply at once -- a
+    request well inside the request budget can still be refused for tokens. Each
+    dimension gets its own budget and its own bucket, and a request has to
+    satisfy all of them to go out.
+    """
+
+    name: str
+    limit: int
+    remaining: int
+    reset_time: datetime
+    window: timedelta
+    confidence: str = "confirmed"
+
+
+@dataclass
 class RateLimit:
-    """Internal rate limit tracking data."""
+    """
+    Internal rate limit tracking data for one endpoint scope.
+
+    The flat fields describe the ``requests`` dimension, which every API has and
+    which stored rows from earlier versions expect. Anything else the API meters
+    -- tokens per minute, requests per day -- lives in :attr:`dimensions`. Use
+    :meth:`all_dimensions` to walk them uniformly.
+    """
 
     endpoint: str
     limit: int
     remaining: int
     reset_time: datetime
     window: timedelta
-    last_updated: datetime = field(default_factory=datetime.utcnow)
+    last_updated: datetime = field(default_factory=utcnow)
     confidence: str = "confirmed"
+    dimensions: Dict[str, LimitDimension] = field(default_factory=dict)
+    """Dimensions beyond ``requests``, keyed by name."""
+
+    def all_dimensions(self) -> Iterator[LimitDimension]:
+        """Yield every dimension, ``requests`` first."""
+        yield LimitDimension(
+            name=REQUESTS,
+            limit=self.limit,
+            remaining=self.remaining,
+            reset_time=self.reset_time,
+            window=self.window,
+            confidence=self.confidence,
+        )
+        for dimension in self.dimensions.values():
+            yield dimension
+
+    def dimension(self, name: str) -> Optional[LimitDimension]:
+        """Get one dimension by name, or None if this scope does not meter it."""
+        if name == REQUESTS:
+            return next(self.all_dimensions())
+        return self.dimensions.get(name)
+
+    def with_dimension(self, dimension: LimitDimension) -> "RateLimit":
+        """Return a copy with ``dimension`` added or replaced."""
+        if dimension.name == REQUESTS:
+            return RateLimit(
+                endpoint=self.endpoint,
+                limit=dimension.limit,
+                remaining=dimension.remaining,
+                reset_time=dimension.reset_time,
+                window=dimension.window,
+                confidence=dimension.confidence,
+                dimensions=dict(self.dimensions),
+            )
+
+        merged = dict(self.dimensions)
+        merged[dimension.name] = dimension
+        return RateLimit(
+            endpoint=self.endpoint,
+            limit=self.limit,
+            remaining=self.remaining,
+            reset_time=self.reset_time,
+            window=self.window,
+            confidence=self.confidence,
+            dimensions=merged,
+        )
 
     def to_status(self) -> RateLimitStatus:
         """Convert to public status object."""
@@ -68,6 +150,7 @@ class RateLimit:
             reset_time=self.reset_time,
             window=self.window,
             confidence=self.confidence,
+            dimensions={d.name: d for d in self.all_dimensions()},
         )
 
 
@@ -78,7 +161,7 @@ class TokenBucket:
     capacity: float
     tokens: float
     refill_rate: float  # tokens per second
-    last_update: datetime = field(default_factory=datetime.utcnow)
+    last_update: datetime = field(default_factory=utcnow)
 
     def refill(self, now: Optional[datetime] = None) -> None:
         """Refill tokens based on elapsed time."""
