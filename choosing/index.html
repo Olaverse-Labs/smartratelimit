@@ -763,6 +763,8 @@
       
         
       
+        
+      
     
     
     
@@ -823,6 +825,34 @@
     
   
     Detection & Headers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Profiles
   
 
     
@@ -1244,8 +1274,14 @@
 <tr>
 <td>Concurrency model</td>
 <td><code>RLock</code></td>
-<td><code>RLock</code> + SQLite locking</td>
-<td><code>RLock</code> + Redis</td>
+<td><code>BEGIN IMMEDIATE</code> transaction</td>
+<td>Server-side Lua script</td>
+</tr>
+<tr>
+<td>Token consumption</td>
+<td>atomic</td>
+<td>atomic</td>
+<td>atomic</td>
 </tr>
 </tbody>
 </table>
@@ -1260,20 +1296,20 @@
 </ul>
 <h2 id="things-worth-knowing-before-you-commit">Things worth knowing before you commit<a class="headerlink" href="#things-worth-knowing-before-you-commit" title="Permanent link">&para;</a></h2>
 <p><strong>SQLite writes on every request.</strong> Each request reads and writes rows and commits. For a job doing a few requests per second that's invisible; for a tight loop against a very high quota it isn't free. If you're paced at 1000 requests/hour anyway, this never matters.</p>
-<p><strong>SQLite across processes is real but coarse.</strong> Multiple processes on one machine do share the file, and updates are serialised by SQLite's own locking. Under heavy simultaneous writes you can see lock contention, and two workers can each read the same bucket state before either writes — the shared quota is approximate, not transactional.</p>
-<p><strong>Redis is shared but not atomic.</strong> State lives in Redis hashes with a read-modify-write in the client, not a Lua script. Many workers still drift slightly under high concurrency. It is dramatically better than each worker guessing alone, and it is not a distributed lock.</p>
+<p><strong>Token accounting is atomic on every backend.</strong> Consuming a token is one indivisible step inside the store, not a read in the client followed by a write: <code>MemoryStorage</code> does it under its lock, <code>SQLiteStorage</code> inside a <code>BEGIN IMMEDIATE</code> write transaction, <code>RedisStorage</code> in a server-side Lua script using the Redis clock. Two workers cannot both spend the same token, so the shared quota is exact rather than approximate. (Before 0.4.0 this was a client-side read-modify-write and workers did drift.)</p>
+<p><strong>SQLite serialises writers.</strong> One writer holds the database lock at a time. Connections use WAL and a five-second busy timeout, so concurrent limiters queue rather than erroring — but a very high quota driven by many processes will feel that queue. That is the cost of the count being exact.</p>
 <p><strong>Redis keys expire on their own.</strong> Rate limits get a TTL of their window plus an hour; token buckets get 24 hours. Nothing to clean up.</p>
-<p><strong>Both fail soft.</strong> An unreachable Redis or an unwritable SQLite path logs a warning and falls back to memory. Check explicitly at startup if shared state is load-bearing — see the note in <a href="../concepts/#4-storage">How it works</a>.</p>
+<p><strong>Failure is a choice you make.</strong> By default an unreachable Redis fails <em>open</em>: the request goes out unpaced and a warning is logged, so a limiter outage cannot take your job down with it. When the limit guards something costly — a paid API quota — that is the wrong trade, and <code>fail_closed=True</code> raises <code>StorageUnavailable</code> instead. Redis is pinged at construction rather than on your first real request, because <code>redis-py</code> connects lazily and would otherwise look healthy right up until it silently stopped limiting.</p>
 <h2 id="connection-strings">Connection strings<a class="headerlink" href="#connection-strings" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;memory&quot;</span><span class="p">)</span>                                  <span class="c1"># default</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"memory"</span><span class="p">)</span>                                  <span class="c1"># default</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="p">)</span>                  <span class="c1"># relative path</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;sqlite:////var/lib/app/ratelimit.db&quot;</span><span class="p">)</span>     <span class="c1"># absolute path (4 slashes)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;sqlite:///:memory:&quot;</span><span class="p">)</span>                      <span class="c1"># in-process SQLite</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"sqlite:///ratelimit.db"</span><span class="p">)</span>                  <span class="c1"># relative path</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"sqlite:////var/lib/app/ratelimit.db"</span><span class="p">)</span>     <span class="c1"># absolute path (4 slashes)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"sqlite:///:memory:"</span><span class="p">)</span>                      <span class="c1"># in-process SQLite</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="p">)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;redis://:password@localhost:6379/0&quot;</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;redis://user:password@redis.internal:6379/1&quot;</span><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"redis://localhost:6379/0"</span><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"redis://:password@localhost:6379/0"</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"redis://user:password@redis.internal:6379/1"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Anything else raises <code>ValueError</code>. Working with a backend directly — a custom key prefix, a pre-built client — is covered in <a href="../storage/">Storage Backends</a>.</p>
 

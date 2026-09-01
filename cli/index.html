@@ -658,6 +658,8 @@
       
         
       
+        
+      
     
     
     
@@ -721,6 +723,34 @@
     
   
     Detection & Headers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Profiles
   
 
     
@@ -1190,19 +1220,26 @@
 <h1 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h1>
 <p>Installing the package puts a <code>smartratelimit</code> command on your PATH. It exists mainly to answer two questions from a shell: <em>what does this API advertise?</em> and <em>what quota does my app think it has left?</em></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>smartratelimit<span class="w"> </span>--help
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>-m<span class="w"> </span>smartratelimit.cli<span class="w"> </span>--help<span class="w">     </span><span class="c1"># equivalent, if the script isn&#39;t on PATH</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>-m<span class="w"> </span>smartratelimit.cli<span class="w"> </span>--help<span class="w">     </span><span class="c1"># equivalent, if the script isn't on PATH</span>
 </span></code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title"><code>--fail-closed</code></p>
+<p>Also global. Without it, an unreachable backend degrades quietly to
+in-memory state and <code>status</code> cheerfully reports nothing is tracked. With it,
+the command errors out instead — worth having in a monitoring cron job,
+where a silent empty answer looks like a healthy one.</p>
+</div>
 <div class="admonition warning">
 <p class="admonition-title"><code>--storage</code> comes before the subcommand</p>
 <p>It is a global option, and it defaults to <code>memory</code> — which is empty in a
 fresh process. <code>status</code> and <code>clear</code> are only meaningful against the same
 <strong>SQLite or Redis</strong> backend your application writes to.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>status<span class="w"> </span><span class="s2">&quot;https://api.github.com&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>status<span class="w"> </span><span class="s2">"https://api.github.com"</span>
 </span></code></pre></div>
 </div>
 <h2 id="probe"><code>probe</code><a class="headerlink" href="#probe" title="Permanent link">&para;</a></h2>
 <p>Send one request and show what came back, headers and all. This is the command you run before writing any configuration.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>smartratelimit<span class="w"> </span>probe<span class="w"> </span><span class="s2">&quot;https://api.github.com/users/octocat&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>smartratelimit<span class="w"> </span>probe<span class="w"> </span><span class="s2">"https://api.github.com/users/octocat"</span>
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Probing https://api.github.com/users/octocat...
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
@@ -1225,12 +1262,12 @@ fresh process. <code>status</code> and <code>clear</code> are only meaningful ag
 </ul>
 <p>If the first section shows limit-ish headers and the second says nothing was detected, the API uses names the detector doesn't know: give it a <a href="../detection/#2-custom-header-map"><code>headers_map</code></a>.</p>
 <p>Probing writes to the chosen backend, so you can seed a shared database and inspect it afterwards:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>probe<span class="w"> </span><span class="s2">&quot;https://api.agify.io?name=Michael&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>probe<span class="w"> </span><span class="s2">"https://api.agify.io?name=Michael"</span>
 </span></code></pre></div>
 <p><code>probe</code> issues a real GET. Don't point it at anything with side effects.</p>
 <h2 id="status"><code>status</code><a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
 <p>Read the stored quota for one endpoint.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>status<span class="w"> </span><span class="s2">&quot;https://api.github.com&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>status<span class="w"> </span><span class="s2">"https://api.github.com"</span>
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Endpoint: https://api.github.com
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  Limit: 5000
@@ -1239,40 +1276,50 @@ fresh process. <code>status</code> and <code>clear</code> are only meaningful ag
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  Resets at: 2026-08-15 11:18:25.481203
 </span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  Resets in: 2842 seconds
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  Exceeded: False
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  Confidence: confirmed
 </span></code></pre></div>
+<p><code>Confidence</code> says where the numbers came from: <code>confirmed</code> (the API reported its own window), <code>estimated</code> (it reported a limit but no reset, so the window was assumed) or <code>configured</code> (you set it). An <code>estimated</code> reading prints a note telling you to replace the guess.</p>
 <p>Nothing stored yet:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Endpoint: https://api.github.com
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  No rate limit information available
 </span></code></pre></div>
-<p>The endpoint argument is positional and required — a bare domain works as well as a full URL, since both normalise to <code>scheme://host</code>. Times are UTC.</p>
+<p>The endpoint argument is positional and optional — omit it to show every tracked endpoint. A bare domain works as well as a full URL, and matches whichever scheme was actually stored, so an http-only API is not missed. A path prefix (<code>api.example.com/search</code>) resolves to the narrowest scope covering it. Times are UTC.</p>
 <h2 id="clear"><code>clear</code><a class="headerlink" href="#clear" title="Permanent link">&para;</a></h2>
 <p>Forget a stored quota, so the next request re-learns it from response headers.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>clear<span class="w"> </span><span class="s2">&quot;https://api.github.com&quot;</span><span class="w">   </span><span class="c1"># one endpoint</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>clear<span class="w">                            </span><span class="c1"># everything</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>clear<span class="w"> </span><span class="s2">"https://api.github.com"</span><span class="w">   </span><span class="c1"># one endpoint</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>clear<span class="w">                            </span><span class="c1"># everything</span>
 </span></code></pre></div>
 <p>With no argument it clears the whole backend — including endpoints belonging to other applications sharing that database. Name the endpoint unless you mean all of it.</p>
 <h2 id="list"><code>list</code><a class="headerlink" href="#list" title="Permanent link">&para;</a></h2>
-<p>Currently a placeholder: enumerating stored endpoints isn't part of the storage interface yet, so the command prints a note pointing you at <code>status</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>smartratelimit<span class="w"> </span>list
+<p>Show every endpoint scope the backend is tracking, most specific first.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>list
 </span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Tracked endpoints (2):
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  https://api.example.com/search
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>      8/10 remaining, window 0:01:00, configured
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>  https://api.example.com
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>      97/100 remaining, window 0:01:00, configured
+</span></code></pre></div>
+<p>With the default <code>memory</code> backend nothing persists between commands, so point <code>--storage</code> at the same SQLite or Redis URL your application uses.</p>
 <h2 id="a-working-loop">A working loop<a class="headerlink" href="#a-working-loop" title="Permanent link">&para;</a></h2>
 <p>The CLI is only useful when it reads the same state your code writes, so give both a real backend:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># app.py</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimiter</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="p">)</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;Michael&quot;</span><span class="p">,</span> <span class="s2">&quot;Sarah&quot;</span><span class="p">,</span> <span class="s2">&quot;Alex&quot;</span><span class="p">]:</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="n">r</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="s2">&quot;https://api.agify.io&quot;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">})</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;age&quot;</span><span class="p">])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># app.py</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimiter</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"sqlite:///ratelimit.db"</span><span class="p">)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"Michael"</span><span class="p">,</span> <span class="s2">"Sarah"</span><span class="p">,</span> <span class="s2">"Alex"</span><span class="p">]:</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">r</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"https://api.agify.io"</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="n">name</span><span class="p">})</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">"age"</span><span class="p">])</span>
 </span></code></pre></div>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>python<span class="w"> </span>app.py
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>status<span class="w"> </span><span class="s2">&quot;https://api.agify.io&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>python<span class="w"> </span>app.py
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>status<span class="w"> </span><span class="s2">"https://api.agify.io"</span>
 </span></code></pre></div>
 <h2 id="watching-quota-from-cron">Watching quota from cron<a class="headerlink" href="#watching-quota-from-cron" title="Permanent link">&para;</a></h2>
 <p>Because state is in the backend rather than the process, a monitoring job can check quota without touching the application:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>*/5<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span>status<span class="w"> </span><span class="s2">&quot;https://api.github.com&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/var/log/ratelimit.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>*/5<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"redis://localhost:6379/0"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span>status<span class="w"> </span><span class="s2">"https://api.github.com"</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/var/log/ratelimit.log<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
 </span></code></pre></div>
 <p>For anything richer than a log line, read the same backend from Python and export <a href="../metrics/">metrics</a> — the CLI prints for humans, not for scrapers.</p>
 

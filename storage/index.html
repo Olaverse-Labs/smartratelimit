@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://olaverse-labs.github.io/smartratelimit/storage/">
       
       
-        <link rel="prev" href="../detection/">
+        <link rel="prev" href="../providers/">
       
       
         <link rel="next" href="../async/">
@@ -658,6 +658,8 @@
       
         
       
+        
+      
     
     
     
@@ -721,6 +723,34 @@
     
   
     Detection & Headers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Profiles
   
 
     
@@ -896,10 +926,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#verifying-the-connection" class="md-nav__link">
+  <a href="#when-the-backend-is-unreachable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verifying the connection
+        When the backend is unreachable
       
     </span>
   </a>
@@ -1264,10 +1294,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#verifying-the-connection" class="md-nav__link">
+  <a href="#when-the-backend-is-unreachable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verifying the connection
+        When the backend is unreachable
       
     </span>
   </a>
@@ -1327,23 +1357,23 @@
 <p>The default. A dict guarded by an <code>RLock</code>, with expired rate limits swept out at most once an hour.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimiter</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">()</span>                    <span class="c1"># same as storage=&quot;memory&quot;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">()</span>                    <span class="c1"># same as storage="memory"</span>
 </span></code></pre></div>
 <p>Two <code>RateLimiter()</code> instances in the same process do <strong>not</strong> share memory storage — each constructs its own. If you want two limiters (different header maps, say) to share state, give them a SQLite or Redis URL.</p>
 <h2 id="sqlite">SQLite<a class="headerlink" href="#sqlite" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"sqlite:///ratelimit.db"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Two tables are created on first use: <code>rate_limits</code> (quota, reset time, window per endpoint) and <code>token_buckets</code> (capacity, level, refill rate per bucket key). Timestamps are stored as ISO strings.</p>
 <h3 id="path-forms">Path forms<a class="headerlink" href="#path-forms" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span>               <span class="c1"># relative to the working directory</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s2">&quot;sqlite:///data/ratelimit.db&quot;</span>          <span class="c1"># relative subdirectory</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="s2">&quot;sqlite:////var/lib/app/limits.db&quot;</span>     <span class="c1"># absolute path — note four slashes</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s2">&quot;sqlite:///:memory:&quot;</span>                   <span class="c1"># in-process database, nothing on disk</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="s2">"sqlite:///ratelimit.db"</span>               <span class="c1"># relative to the working directory</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s2">"sqlite:///data/ratelimit.db"</span>          <span class="c1"># relative subdirectory</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="s2">"sqlite:////var/lib/app/limits.db"</span>     <span class="c1"># absolute path — note four slashes</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s2">"sqlite:///:memory:"</span>                   <span class="c1"># in-process database, nothing on disk</span>
 </span></code></pre></div>
 <p>The directory must already exist; SQLite creates the file, not the folder.</p>
 <h3 id="reading-it-from-elsewhere">Reading it from elsewhere<a class="headerlink" href="#reading-it-from-elsewhere" title="Permanent link">&para;</a></h3>
 <p>The file is an ordinary SQLite database, so anything can read it — a monitoring script, <code>sqlite3</code>, or the bundled CLI:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>status<span class="w"> </span><span class="s2">&quot;https://api.github.com&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>status<span class="w"> </span><span class="s2">"https://api.github.com"</span>
 </span></code></pre></div>
 <p>That is the main reason to prefer SQLite over memory even for a single process: your job's quota becomes observable from outside the job.</p>
 <h3 id="sharing-between-processes">Sharing between processes<a class="headerlink" href="#sharing-between-processes" title="Permanent link">&para;</a></h3>
@@ -1351,14 +1381,14 @@
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># worker.py — run this as many times as you like</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimiter</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;sqlite:///shared.db&quot;</span><span class="p">)</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="s2">&quot;https://api.example.com/data&quot;</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"sqlite:///shared.db"</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"https://api.example.com/data"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Writes are serialised by SQLite's own locking, but reads and writes are not one transaction — two workers can read the same bucket level before either writes back. Sharing is approximate under high concurrency. For a handful of workers doing paced work it holds up well; for dozens, use Redis.</p>
 <h2 id="redis">Redis<a class="headerlink" href="#redis" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>smartratelimit<span class="o">[</span>redis<span class="o">]</span>
 </span></code></pre></div>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"redis://localhost:6379/0"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>State lives in Redis hashes under the <code>ratelimit:</code> key prefix:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ratelimit:rate_limit:https://api.github.com
@@ -1366,17 +1396,17 @@
 </span></code></pre></div>
 <p>Keys expire on their own — rate limits after their window plus an hour, buckets after 24 hours — so nothing accumulates.</p>
 <h3 id="connection-strings">Connection strings<a class="headerlink" href="#connection-strings" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="s2">&quot;redis://localhost:6379/0&quot;</span>                        <span class="c1"># default</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="s2">&quot;redis://:password@localhost:6379/0&quot;</span>              <span class="c1"># password only</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="s2">&quot;redis://user:password@redis.internal:6379/1&quot;</span>     <span class="c1"># ACL user, database 1</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="s2">&quot;rediss://user:password@redis.example.com:6380/0&quot;</span> <span class="c1"># TLS</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="s2">"redis://localhost:6379/0"</span>                        <span class="c1"># default</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="s2">"redis://:password@localhost:6379/0"</span>              <span class="c1"># password only</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="s2">"redis://user:password@redis.internal:6379/1"</span>     <span class="c1"># ACL user, database 1</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="s2">"rediss://user:password@redis.example.com:6380/0"</span> <span class="c1"># TLS</span>
 </span></code></pre></div>
 <p>Any URL <code>redis-py</code>'s <code>from_url()</code> understands works, as long as it starts with <code>redis://</code> — note that a <code>rediss://</code> URL will <strong>not</strong> match the <code>redis://</code> prefix check in the constructor and raises <code>ValueError</code>. For TLS, build the backend yourself:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimiter</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">RedisStorage</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">()</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">limiter</span><span class="o">.</span><span class="n">_storage</span> <span class="o">=</span> <span class="n">RedisStorage</span><span class="p">(</span><span class="s2">&quot;rediss://user:pass@redis.example.com:6380/0&quot;</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">limiter</span><span class="o">.</span><span class="n">_storage</span> <span class="o">=</span> <span class="n">RedisStorage</span><span class="p">(</span><span class="s2">"rediss://user:pass@redis.example.com:6380/0"</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="custom-key-prefix">Custom key prefix<a class="headerlink" href="#custom-key-prefix" title="Permanent link">&para;</a></h3>
 <p>Useful when several applications share one Redis database:</p>
@@ -1384,61 +1414,77 @@
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">()</span>
 </span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">limiter</span><span class="o">.</span><span class="n">_storage</span> <span class="o">=</span> <span class="n">RedisStorage</span><span class="p">(</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">redis_url</span><span class="o">=</span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="p">,</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">key_prefix</span><span class="o">=</span><span class="s2">&quot;billing-worker:ratelimit:&quot;</span><span class="p">,</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">redis_url</span><span class="o">=</span><span class="s2">"redis://localhost:6379/0"</span><span class="p">,</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">key_prefix</span><span class="o">=</span><span class="s2">"billing-worker:ratelimit:"</span><span class="p">,</span>
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <div class="admonition note">
-<p class="admonition-title"><code>storage=</code> takes a string, not an object</p>
-<p>The constructor parses a connection string; it does not accept a backend
-instance. Assigning to <code>limiter._storage</code> after construction is the current
-way to install a pre-built backend, and <code>_storage</code> is private — it may
-change between releases. For the three standard backends, prefer the string.</p>
-</div>
-<h3 id="verifying-the-connection">Verifying the connection<a class="headerlink" href="#verifying-the-connection" title="Permanent link">&para;</a></h3>
-<p>Construction falls back to memory on failure rather than raising, so check explicitly if shared state matters:</p>
+<p class="admonition-title"><code>storage=</code> takes a string <strong>or</strong> a backend instance</p>
+<p>The connection string covers the common cases. For options it cannot
+express — a custom Redis <code>key_prefix</code>, a backend of your own — pass a
+constructed <code>StorageBackend</code> instead:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">RedisStorage</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">RedisStorage</span><span class="p">(</span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">redis_client</span><span class="o">.</span><span class="n">ping</span><span class="p">()</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ Redis reachable — limits are shared&quot;</span><span class="p">)</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✗ Redis unavailable: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">storage</span><span class="o">=</span><span class="n">RedisStorage</span><span class="p">(</span><span class="s2">"redis://localhost:6379/0"</span><span class="p">,</span> <span class="n">key_prefix</span><span class="o">=</span><span class="s2">"myapp:"</span><span class="p">)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="p">)</span>
 </span></code></pre></div>
-<p>Redis operations at runtime also degrade quietly: a read that fails returns <code>None</code> (treated as "no limit known") and a write that fails is dropped. The job keeps going; the pacing gets less accurate.</p>
+</div>
+<h3 id="when-the-backend-is-unreachable">When the backend is unreachable<a class="headerlink" href="#when-the-backend-is-unreachable" title="Permanent link">&para;</a></h3>
+<p><code>redis-py</code> connects lazily, so the limiter pings Redis at construction rather than discovering the problem on your first real request. What happens next is your call:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Default: fail open. Requests go out unpaced, loudly logged.</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"redis://localhost:6379/0"</span><span class="p">)</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Fail closed. Raises StorageUnavailable rather than sending unpaced traffic.</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"redis://localhost:6379/0"</span><span class="p">,</span> <span class="n">fail_closed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Failing open is right when the limit is advisory — a limiter outage should not take your job down with it. It is wrong when the limit guards a paid quota, where unpaced traffic is the more expensive failure. <code>StorageUnavailable</code> subclasses <code>RateLimitExceeded</code>, so handlers you already have keep working.</p>
+<p>The client is kept either way rather than being swapped for memory storage, so a Redis that is briefly down at boot resumes sharing limits when it returns. Runtime read and write failures are logged: a failed read is treated as "no limit known", a failed write is dropped, and a failed <code>acquire</code> either fails open with a warning or raises, per <code>fail_closed</code>. Nothing is silent.</p>
 <h2 id="writing-your-own-backend">Writing your own backend<a class="headerlink" href="#writing-your-own-backend" title="Permanent link">&para;</a></h2>
-<p>Subclass <code>StorageBackend</code> and implement five methods:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">StorageBackend</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">TokenBucket</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">DynamoStorage</span><span class="p">(</span><span class="n">StorageBackend</span><span class="p">):</span>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_rate_limit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RateLimit</span><span class="p">]:</span> <span class="o">...</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_rate_limit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rate_limit</span><span class="p">:</span> <span class="n">RateLimit</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_token_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TokenBucket</span><span class="p">]:</span> <span class="o">...</span>
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_token_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">bucket</span><span class="p">:</span> <span class="n">TokenBucket</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
-</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<p>Subclass <code>StorageBackend</code> and implement seven methods:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">StorageBackend</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">TokenBucket</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">DynamoStorage</span><span class="p">(</span><span class="n">StorageBackend</span><span class="p">):</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_rate_limit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RateLimit</span><span class="p">]:</span> <span class="o">...</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_rate_limit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rate_limit</span><span class="p">:</span> <span class="n">RateLimit</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_token_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TokenBucket</span><span class="p">]:</span> <span class="o">...</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_token_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">bucket</span><span class="p">:</span> <span class="n">TokenBucket</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">list_endpoints</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">acquire</span><span class="p">(</span>
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>        <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>        <span class="n">capacity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>        <span class="n">refill_rate</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>        <span class="n">tokens</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span> <span class="o">...</span>
 </span></code></pre></div>
+<p><strong><code>acquire</code> is the one that matters.</strong> It must refill the bucket and consume from it as a single indivisible operation, against however many callers your backend can have at once. Building it out of <code>get_token_bucket</code> / mutate / <code>set_token_bucket</code> is not a substitute: two callers read the same token count, both write it back one lower, and two requests cost one token. Use whatever your store gives you — a transaction, a compare-and-swap, a server-side script.</p>
+<p>Return <code>(True, 0.0)</code> when the tokens were consumed, and <code>(False, seconds_to_wait)</code> when they were not — with nothing consumed. Return <code>float("inf")</code> as the wait if the bucket can never refill.</p>
 <p>Contract notes:</p>
 <ul>
-<li><code>endpoint</code> keys are <code>scheme://host</code>; bucket keys are <code>scheme://host:default</code></li>
+<li><code>endpoint</code> keys are endpoint scopes: <code>scheme://host</code>, optionally with a path prefix (<code>https://api.example.com/search</code>). Bucket keys are that scope plus <code>:default</code>.</li>
 <li>Getters return <code>None</code> when nothing is stored — never raise for a miss</li>
 <li><code>clear(endpoint)</code> must also remove that endpoint's bucket keys; <code>clear(None)</code> removes everything</li>
-<li>Assume concurrent calls from multiple threads</li>
+<li><code>list_endpoints()</code> returns every scope with a stored limit; the CLI's <code>list</code> reads it</li>
+<li>Optionally override <code>get_rate_limit_for(candidates)</code> to resolve a scope in one round trip. The default walks the list calling <code>get_rate_limit</code>, which costs a query per path segment on a remote store. Candidates arrive most-specific-first and that order is the precedence order.</li>
+<li>Assume concurrent calls from multiple threads, and — if your store is shared — from multiple processes</li>
 </ul>
-<p>Then attach it:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">()</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">limiter</span><span class="o">.</span><span class="n">_storage</span> <span class="o">=</span> <span class="n">DynamoStorage</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<p>Then pass it in:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="n">DynamoStorage</span><span class="p">(</span><span class="o">...</span><span class="p">))</span>
 </span></code></pre></div>
 <h2 id="clearing-state">Clearing state<a class="headerlink" href="#clearing-state" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">limiter</span><span class="o">.</span><span class="n">clear</span><span class="p">(</span><span class="s2">&quot;api.github.com&quot;</span><span class="p">)</span>   <span class="c1"># one endpoint, quota and bucket</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">limiter</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>                   <span class="c1"># everything in this backend</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">limiter</span><span class="o">.</span><span class="n">clear</span><span class="p">(</span><span class="s2">"api.github.com"</span><span class="p">)</span>   <span class="c1"># one endpoint, quota and bucket</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">limiter</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>                   <span class="c1"># everything in this backend</span>
 </span></code></pre></div>
 <p>Or from the shell, against the same backend:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>clear<span class="w"> </span><span class="s2">&quot;https://api.github.com&quot;</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">&quot;sqlite:///ratelimit.db&quot;</span><span class="w"> </span>clear
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>clear<span class="w"> </span><span class="s2">"https://api.github.com"</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>smartratelimit<span class="w"> </span>--storage<span class="w"> </span><span class="s2">"sqlite:///ratelimit.db"</span><span class="w"> </span>clear
 </span></code></pre></div>
 <p>Clearing makes the limiter forget a quota entirely — the next request goes out unpaced and re-learns from the response headers. That is usually what you want after changing an API key or plan tier.</p>
 

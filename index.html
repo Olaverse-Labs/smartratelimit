@@ -752,6 +752,8 @@
       
         
       
+        
+      
     
     
     
@@ -812,6 +814,34 @@
     
   
     Detection & Headers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Profiles
   
 
     
@@ -1153,7 +1183,7 @@
 
 
 <div class="ov-hero">
-  <div class="ov-hero-badge">v0.3.2</div>
+  <div class="ov-hero-badge">v0.4.0</div>
   <h1 class="ov-hero-title">smartratelimit</h1>
   <p class="ov-hero-sub">Your API's rate limits, read from its own headers and respected automatically — no 429s, no hand-rolled sleep loops</p>
   <div class="ov-hero-install">
@@ -1240,14 +1270,14 @@
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">()</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># The first response teaches the limiter GitHub&#39;s limit; every call after</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># The first response teaches the limiter GitHub's limit; every call after</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># that is paced to fit inside it.</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;octocat&quot;</span><span class="p">,</span> <span class="s2">&quot;torvalds&quot;</span><span class="p">,</span> <span class="s2">&quot;gvanrossum&quot;</span><span class="p">]:</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">response</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;https://api.github.com/users/</span><span class="si">{</span><span class="n">user</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"octocat"</span><span class="p">,</span> <span class="s2">"torvalds"</span><span class="p">,</span> <span class="s2">"gvanrossum"</span><span class="p">]:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">response</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"https://api.github.com/users/</span><span class="si">{</span><span class="n">user</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">"name"</span><span class="p">])</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">status</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">get_status</span><span class="p">(</span><span class="s2">&quot;api.github.com&quot;</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">remaining</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">limit</span><span class="si">}</span><span class="s2"> left, resets in </span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">reset_in</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">status</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">get_status</span><span class="p">(</span><span class="s2">"api.github.com"</span><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">remaining</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">limit</span><span class="si">}</span><span class="s2"> left, resets in </span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">reset_in</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">s"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Nothing above names a rate limit. GitHub's headers did.</p>
 <hr />

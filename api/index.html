@@ -656,6 +656,8 @@
       
         
       
+        
+      
     
     
     
@@ -716,6 +718,34 @@
     
   
     Detection & Headers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Profiles
   
 
     
@@ -993,10 +1023,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#requestmethod-url-kwargs-requestsresponse" class="md-nav__link">
+  <a href="#requestmethod-url-costnone-kwargs-requestsresponse" class="md-nav__link">
     <span class="md-ellipsis">
       
-        .request(method, url, **kwargs) -&gt; requests.Response
+        .request(method, url, cost=None, **kwargs) -&gt; requests.Response
       
     </span>
   </a>
@@ -1030,6 +1060,17 @@
     <span class="md-ellipsis">
       
         .set_limit(endpoint, limit, window="1h") -&gt; None
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list_endpoints-liststr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .list_endpoints() -&gt; list[str]
       
     </span>
   </a>
@@ -1409,10 +1450,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#requestmethod-url-kwargs-requestsresponse" class="md-nav__link">
+  <a href="#requestmethod-url-costnone-kwargs-requestsresponse" class="md-nav__link">
     <span class="md-ellipsis">
       
-        .request(method, url, **kwargs) -&gt; requests.Response
+        .request(method, url, cost=None, **kwargs) -&gt; requests.Response
       
     </span>
   </a>
@@ -1446,6 +1487,17 @@
     <span class="md-ellipsis">
       
         .set_limit(endpoint, limit, window="1h") -&gt; None
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list_endpoints-liststr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .list_endpoints() -&gt; list[str]
       
     </span>
   </a>
@@ -1812,22 +1864,53 @@
 <td><code>False</code></td>
 <td>Raise <code>RateLimitExceeded</code> instead of waiting</td>
 </tr>
+<tr>
+<td><code>retry</code></td>
+<td><code>RetryConfig \| None</code></td>
+<td><code>None</code></td>
+<td>How to retry a 429/503/504. Defaults to three attempts with jittered exponential backoff</td>
+</tr>
+<tr>
+<td><code>fail_closed</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Raise <code>StorageUnavailable</code> when shared storage is unreachable, instead of failing open and sending traffic unpaced</td>
+</tr>
+<tr>
+<td><code>use_provider_profiles</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Seed documented limits for known hosts before their first response — see <a href="../providers/">Provider Profiles</a></td>
+</tr>
+<tr>
+<td><code>authenticated</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Whether requests carry credentials. Documented limits often differ by orders of magnitude between anonymous and authenticated callers</td>
+</tr>
 </tbody>
 </table>
-<p>Raises <code>ValueError</code> for an unrecognised storage string. A SQLite or Redis backend that fails to initialise logs a warning and falls back to memory.</p>
+<p>Raises <code>ValueError</code> for an unrecognised storage string. <code>storage</code> also accepts a ready-made <code>StorageBackend</code> instance for options the connection string cannot express, such as a custom Redis <code>key_prefix</code>.</p>
+<p>A SQLite backend that cannot open its file logs a warning and falls back to memory. An unreachable Redis is kept — and warned about at construction — so it recovers on its own when Redis returns. With <code>fail_closed=True</code> both raise instead.</p>
 <p>If <code>default_limits</code> contains more than one key, the shortest window present wins (<code>second</code> → <code>minute</code> → <code>hour</code>) and the rest are ignored.</p>
-<h3 id="requestmethod-url-kwargs-requestsresponse"><code>.request(method, url, **kwargs) -&gt; requests.Response</code><a class="headerlink" href="#requestmethod-url-kwargs-requestsresponse" title="Permanent link">&para;</a></h3>
+<h3 id="requestmethod-url-costnone-kwargs-requestsresponse"><code>.request(method, url, cost=None, **kwargs) -&gt; requests.Response</code><a class="headerlink" href="#requestmethod-url-costnone-kwargs-requestsresponse" title="Permanent link">&para;</a></h3>
 <p>Make a paced request. <code>**kwargs</code> are passed through to <code>requests.request()</code>.</p>
-<p>Waits (or raises, with <code>raise_on_limit=True</code>) when the endpoint's bucket is empty, then updates the stored quota from the response headers. On a 429 carrying <code>Retry-After</code>, sleeps and retries <strong>once</strong> unless <code>raise_on_limit=True</code>.</p>
+<p><code>cost</code> says what this request spends. <code>None</code> is one request; a number is that many requests; a mapping such as <code>{"tokens": 1500}</code> charges other <a href="../concepts/#6-dimensions">metered dimensions</a> too, with <code>requests</code> defaulting to 1 inside it. Every dimension named is charged in one atomic step — a request never spends its request allowance and is then refused for tokens.</p>
+<p>Waits (or raises, with <code>raise_on_limit=True</code>) when the endpoint's bucket is empty, then updates the stored quota from the response headers.</p>
+<p>A 429, 503 or 504 is retried per the <code>retry</code> config. <code>Retry-After</code> decides the wait when present — seconds or HTTP-date, capped at <code>max_delay</code> — otherwise exponential backoff with jitter applies. When the attempts run out the last response is returned as-is. With <code>raise_on_limit=True</code> a retryable rejection raises <code>RateLimitExceeded</code> instead of being waited out.</p>
 <h3 id="wrap_sessionsession-none"><code>.wrap_session(session) -&gt; None</code><a class="headerlink" href="#wrap_sessionsession-none" title="Permanent link">&para;</a></h3>
 <p>Replace <code>session.request</code> with a paced version, in place. Returns <code>None</code>.</p>
-<p>The wrapped calls are issued through the limiter's own internal session, so headers, auth and cookies configured on your session are <strong>not</strong> applied — pass them per call instead.</p>
+<p>Your session stays the transport: its headers, cookies, auth, adapters, proxies and connection pool all continue to apply. Only the scheduling of the call is taken over. Wrapping the same session twice is a no-op.</p>
 <h3 id="get_statusendpoint-ratelimitstatus-none"><code>.get_status(endpoint) -&gt; RateLimitStatus | None</code><a class="headerlink" href="#get_statusendpoint-ratelimitstatus-none" title="Permanent link">&para;</a></h3>
-<p>Current stored status for an endpoint. Accepts a bare domain or a full URL; both normalise to <code>scheme://host</code>. Returns <code>None</code> when nothing has been detected or set.</p>
+<p>Current stored status for an endpoint. Accepts a bare domain, a full URL, or a domain plus path prefix, and resolves to the narrowest scope governing it. A bare domain matches whichever scheme was actually stored, so an http-only API is not missed. Returns <code>None</code> when nothing has been detected or set.</p>
 <h3 id="set_limitendpoint-limit-window1h-none"><code>.set_limit(endpoint, limit, window="1h") -&gt; None</code><a class="headerlink" href="#set_limitendpoint-limit-window1h-none" title="Permanent link">&para;</a></h3>
 <p>Store a limit explicitly, without waiting to detect one.</p>
-<p><code>window</code> is a whole number plus a unit — <code>"30s"</code>, <code>"15m"</code>, <code>"1h"</code>, <code>"1d"</code>. Anything unparseable (including a decimal like <code>"1.5h"</code>) silently falls back to one hour.</p>
-<p>A subsequently detected limit from response headers replaces what you set.</p>
+<p><code>dimension</code> (default <code>"requests"</code>) is what is being metered. Call <code>set_limit</code> again with another name to add a second budget to the same scope; a request then has to satisfy both.</p>
+<p><code>endpoint</code> is a domain or URL, optionally narrowed by a path prefix — <code>"api.example.com"</code> covers the host, <code>"api.example.com/search"</code> covers only paths under <code>/search</code> and takes precedence there. Each scope gets its own bucket.</p>
+<p><code>window</code> is a positive whole number plus a unit — <code>"30s"</code>, <code>"15m"</code>, <code>"1h"</code>, <code>"1d"</code>. Anything else, including a decimal like <code>"1.5h"</code>, raises <code>ValueError</code>: a mistyped window silently becoming one hour paces you against a limit you never asked for, with nothing to tell you.</p>
+<p>What you set is marked <code>confidence="configured"</code>, and <strong>detected headers will not overwrite it</strong> — you set it because the headers were absent or wrong.</p>
+<h3 id="list_endpoints-liststr"><code>.list_endpoints() -&gt; list[str]</code><a class="headerlink" href="#list_endpoints-liststr" title="Permanent link">&para;</a></h3>
+<p>Every endpoint scope with a stored rate limit, most specific first.</p>
 <h3 id="clearendpointnone-none"><code>.clear(endpoint=None) -&gt; None</code><a class="headerlink" href="#clearendpointnone-none" title="Permanent link">&para;</a></h3>
 <p>Delete the stored quota and bucket for one endpoint, or for everything in the backend when <code>endpoint</code> is <code>None</code>.</p>
 <hr />
@@ -1905,9 +1988,9 @@
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">status</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">get_status</span><span class="p">(</span><span class="s2">&quot;api.github.com&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">status</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">get_status</span><span class="p">(</span><span class="s2">"api.github.com"</span><span class="p">)</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span> <span class="n">status</span> <span class="ow">and</span> <span class="n">status</span><span class="o">.</span><span class="n">utilization</span> <span class="o">&gt;</span> <span class="mf">0.9</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">remaining</span><span class="si">}</span><span class="s2"> left, resets in </span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">reset_in</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">remaining</span><span class="si">}</span><span class="s2"> left, resets in </span><span class="si">{</span><span class="n">status</span><span class="o">.</span><span class="n">reset_in</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">s"</span><span class="p">)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="ratelimitexceeded">RateLimitExceeded<a class="headerlink" href="#ratelimitexceeded" title="Permanent link">&para;</a></h2>

@@ -658,6 +658,8 @@
       
         
       
+        
+      
     
     
     
@@ -721,6 +723,34 @@
     
   
     Detection & Headers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provider Profiles
   
 
     
@@ -1241,7 +1271,7 @@
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">handler</span> <span class="o">=</span> <span class="n">RetryHandler</span><span class="p">(</span><span class="n">RetryConfig</span><span class="p">(</span><span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">EXPONENTIAL</span><span class="p">))</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="s2">&quot;https://api.example.com/data&quot;</span><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"https://api.example.com/data"</span><span class="p">)</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
@@ -1293,21 +1323,24 @@
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Patient: a rate limit that resets on a long window</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">RetryConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">EXPONENTIAL</span><span class="p">,</span> <span class="n">base_delay</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">max_delay</span><span class="o">=</span><span class="mf">120.0</span><span class="p">)</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># Predictable: a flaky upstream where jitter isn&#39;t the issue</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># Predictable: a flaky upstream where jitter isn't the issue</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">RetryConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">FIXED</span><span class="p">,</span> <span class="n">base_delay</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">max_retries</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Impatient: retry only transient server errors, never rate limits</span>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">RetryConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">,</span> <span class="n">retry_on_status</span><span class="o">=</span><span class="p">[</span><span class="mi">502</span><span class="p">,</span> <span class="mi">503</span><span class="p">,</span> <span class="mi">504</span><span class="p">])</span>
 </span></code></pre></div>
 <div class="admonition note">
-<p class="admonition-title">No jitter</p>
-<p>Delays are deterministic. If many workers hit the same limit at the same
-moment, they retry in lockstep. Add your own jitter when that matters —
-<code>time.sleep(random.uniform(0, 1))</code> before the call is usually enough.</p>
+<p class="admonition-title">Jitter is opt-in</p>
+<p>Delays are deterministic unless you ask for jitter, so a configured schedule
+stays exactly predictable. If many workers hit the same limit at the same
+moment they would otherwise retry in lockstep and collide again — pass
+<code>jitter=0.1</code> to spread them by up to 10% either way. <code>RateLimiter</code> and
+<code>AsyncRateLimiter</code> default their own retries to <code>jitter=0.1</code>.</p>
 </div>
 <h2 id="which-statuses-retry">Which statuses retry<a class="headerlink" href="#which-statuses-retry" title="Permanent link">&para;</a></h2>
 <p><code>retry_on_status</code> decides. The default <code>[429, 503, 504]</code> covers "you're going too fast" and "the upstream is briefly unwell". Anything else — a 400, a 404, a 500 — is returned immediately, because retrying it will not help.</p>
-<p>Note that <code>RetryHandler</code> counts a <strong>429 response as a reason to retry</strong>, while <code>RateLimiter.request()</code> separately honours <code>Retry-After</code> by sleeping and retrying once on its own. Stacking them is fine and usually right: the limiter handles the polite single retry, the handler handles persistence.</p>
+<p><code>RateLimiter.request()</code> already retries these statuses on its own, using the same <code>RetryConfig</code> type — pass one as <code>RateLimiter(retry=...)</code> to configure it. Reach for a standalone <code>RetryHandler</code> when you need to retry something that is not a limiter request, or want a different schedule around one particular call.</p>
+<p><code>RetryStrategy.NONE</code> means a single attempt: retrying with a zero delay would just hammer an endpoint that already said no.</p>
 <h2 id="exceptions-are-retried-too">Exceptions are retried too<a class="headerlink" href="#exceptions-are-retried-too" title="Permanent link">&para;</a></h2>
 <p>If the callable raises — a connection reset, a read timeout — the handler waits and tries again on the same schedule. After the last attempt, the final exception is re-raised unchanged:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
@@ -1316,14 +1349,14 @@ moment, they retry in lockstep. Add your own jitter when that matters —
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">try</span><span class="p">:</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="p">)</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">Timeout</span><span class="p">:</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="c1"># all four attempts timed out</span>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="o">...</span>
 </span></code></pre></div>
 <p>When retries are exhausted on a <em>status code</em> (rather than an exception), the last response is returned rather than raised — check <code>response.status_code</code> afterwards.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">))</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="n">url</span><span class="p">))</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="c1"># still rate limited after every retry</span>
@@ -1341,7 +1374,7 @@ moment, they retry in lockstep. Add your own jitter when that matters —
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">call</span><span class="p">():</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="k">return</span> <span class="k">await</span> <span class="n">limiter</span><span class="o">.</span><span class="n">arequest_httpx</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="k">return</span> <span class="k">await</span> <span class="n">limiter</span><span class="o">.</span><span class="n">arequest_httpx</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s2">"GET"</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_async</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
 </span></code></pre></div>
@@ -1349,9 +1382,9 @@ moment, they retry in lockstep. Add your own jitter when that matters —
 <h2 id="arguments">Arguments<a class="headerlink" href="#arguments" title="Permanent link">&para;</a></h2>
 <p>Both methods forward extra arguments to the callable, which is often tidier than a closure:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="k">return</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;https://api.github.com/users/</span><span class="si">{</span><span class="n">user</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="k">return</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"https://api.github.com/users/</span><span class="si">{</span><span class="n">user</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="s2">&quot;octocat&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="s2">"octocat"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="picking-numbers">Picking numbers<a class="headerlink" href="#picking-numbers" title="Permanent link">&para;</a></h2>
 <ul>
