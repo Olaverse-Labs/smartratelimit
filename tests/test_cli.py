@@ -1,12 +1,14 @@
 """Tests for CLI tools."""
 
 import sys
+from datetime import datetime, timedelta
 from io import StringIO
 from unittest.mock import patch
 
 import pytest
 
 from smartratelimit.cli import cmd_clear, cmd_probe, cmd_status, main
+from smartratelimit.models import RateLimitStatus
 
 
 class TestCLI:
@@ -17,19 +19,15 @@ class TestCLI:
         with patch("sys.argv", ["smartratelimit", "status", "api.example.com"]):
             with patch("smartratelimit.cli.RateLimiter") as mock_limiter_class:
                 mock_limiter = mock_limiter_class.return_value
-                mock_status = type(
-                    "Status",
-                    (),
-                    {
-                        "limit": 100,
-                        "remaining": 50,
-                        "utilization": 0.5,
-                        "reset_time": None,
-                        "reset_in": 3600.0,
-                        "is_exceeded": False,
-                    },
-                )()
-                mock_limiter.get_status.return_value = mock_status
+                # The real dataclass, so this stub cannot drift out of sync
+                # with the fields the CLI prints.
+                mock_limiter.get_status.return_value = RateLimitStatus(
+                    endpoint="https://api.example.com",
+                    limit=100,
+                    remaining=50,
+                    reset_time=datetime.utcnow() + timedelta(hours=1),
+                    window=timedelta(hours=1),
+                )
 
                 # Capture stdout
                 old_stdout = sys.stdout
@@ -40,6 +38,7 @@ class TestCLI:
                     output = sys.stdout.getvalue()
                     assert "Limit: 100" in output
                     assert "Remaining: 50" in output
+                    assert "Confidence: confirmed" in output
                 finally:
                     sys.stdout = old_stdout
 
@@ -112,9 +111,13 @@ class TestCLI:
 
         mock_limiter = type("RateLimiter", (), {
             "request": lambda self, *args, **kwargs: mock_response,
-            "get_status": lambda self, url: type("Status", (), {
-                "limit": 5000, "remaining": 4999, "window": None
-            })()
+            "get_status": lambda self, url: RateLimitStatus(
+                endpoint="https://api.github.com",
+                limit=5000,
+                remaining=4999,
+                window=timedelta(hours=1),
+                confidence="estimated",
+            )
         })()
 
         with patch("smartratelimit.cli.RateLimiter", return_value=mock_limiter):
@@ -132,6 +135,10 @@ class TestCLI:
                 output = sys.stdout.getvalue()
                 assert "Response Status: 200" in output
                 assert "X-RateLimit-Limit" in output
+                # An assumed window must be labelled as one, not reported as
+                # though the API had stated it.
+                assert "Confidence: estimated" in output
+                assert "assumption" in output
             finally:
                 sys.stdout = old_stdout
 

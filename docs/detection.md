@@ -71,7 +71,7 @@ Header lookup goes through `requests`' case-insensitive header mapping, so `x-ra
 
 If a 429 arrives with no rate-limit headers at all, `Retry-After` is still useful: it gives a window (and `remaining = 0`) even though it never gives a limit. Both integer seconds and RFC 7231 HTTP dates are parsed.
 
-This path informs the *stored window*, and `request()` separately honours `Retry-After` by sleeping and retrying once. See [What happens on a 429](concepts.md#what-happens-on-a-429).
+This path informs the *stored window*, and `request()` separately honours `Retry-After` when deciding how long to wait before each retry. See [What happens on a 429](concepts.md#what-happens-on-a-429).
 
 ## How reset values are parsed
 
@@ -88,6 +88,26 @@ The 86400 cutoff is the one rule to remember: a reset expressed as "seconds rema
 
 Timestamps that resolve to a time in the past are discarded, and the window falls back to one hour.
 
+## Metered dimensions beyond requests
+
+An LLM API meters tokens as well as requests, and the token budget is usually the
+one that binds first. Those headers are read too, and stored as separate
+[dimensions](concepts.md#6-dimensions) of the same scope:
+
+| Host | Dimension | Headers |
+|---|---|---|
+| `api.openai.com` | `tokens` | `x-ratelimit-{limit,remaining,reset}-tokens` |
+| `api.anthropic.com` | `tokens` | `anthropic-ratelimit-tokens-{limit,remaining,reset}` |
+| `api.anthropic.com` | `input_tokens`, `output_tokens` | `anthropic-ratelimit-{input,output}-tokens-*` |
+| any | `tokens` | `X-RateLimit-{Limit,Remaining,Reset}-Tokens` |
+
+Reading only the request headers would leave the limiter confidently pacing
+against a number that is not the constraint. Tell it what each call costs:
+
+```python
+limiter.request("POST", url, json=payload, cost={"tokens": 1500})
+```
+
 ## Gaps and fallbacks
 
 APIs are inconsistent. What happens when a piece is missing:
@@ -95,10 +115,23 @@ APIs are inconsistent. What happens when a piece is missing:
 | Missing | Behaviour |
 |---|---|
 | `remaining` | Assumed equal to `limit` — treated as a fresh window |
-| `reset` | Window defaults to **1 hour** from now |
+| `reset` | Window defaults to **1 hour** from now, and the limit is marked `confidence="estimated"` |
 | `limit` | Nothing is stored; detection fails and the request is unpaced |
 
-That last row is the important one. **Without a limit header there is nothing to pace against** — `remaining` alone isn't enough. Supply the limit yourself:
+The `reset` row deserves care. A limit of `100` with no reset header could mean 100 per minute or 100 per day, and guessing wrong either throttles you for nothing or lets you sail past the real limit. The library does not present that guess as a reading — `status.confidence` is `"estimated"` whenever the window was assumed:
+
+```python
+status = limiter.get_status("api.example.com")
+if status.confidence == "estimated":
+    # Replace the guess with the limit from the provider's docs
+    limiter.set_limit("api.example.com", limit=100, window="1m")
+```
+
+`confidence` is `"confirmed"` when the API reported its own window, and
+`"configured"` when you set the limit yourself. Change the assumed window with
+`RateLimitDetector(default_window=...)`.
+
+The last row is the important one. **Without a limit header there is nothing to pace against** — `remaining` alone isn't enough. Supply the limit yourself:
 
 ```python
 # Fallback for any endpoint with no detected limit

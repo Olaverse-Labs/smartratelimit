@@ -7,6 +7,12 @@ smartratelimit --help
 python -m smartratelimit.cli --help     # equivalent, if the script isn't on PATH
 ```
 
+!!! tip "`--fail-closed`"
+    Also global. Without it, an unreachable backend degrades quietly to
+    in-memory state and `status` cheerfully reports nothing is tracked. With it,
+    the command errors out instead — worth having in a monitoring cron job,
+    where a silent empty answer looks like a healthy one.
+
 !!! warning "`--storage` comes before the subcommand"
     It is a global option, and it defaults to `memory` — which is empty in a
     fresh process. `status` and `clear` are only meaningful against the same
@@ -71,7 +77,10 @@ Endpoint: https://api.github.com
   Resets at: 2026-08-15 11:18:25.481203
   Resets in: 2842 seconds
   Exceeded: False
+  Confidence: confirmed
 ```
+
+`Confidence` says where the numbers came from: `confirmed` (the API reported its own window), `estimated` (it reported a limit but no reset, so the window was assumed) or `configured` (you set it). An `estimated` reading prints a note telling you to replace the guess.
 
 Nothing stored yet:
 
@@ -80,7 +89,7 @@ Endpoint: https://api.github.com
   No rate limit information available
 ```
 
-The endpoint argument is positional and required — a bare domain works as well as a full URL, since both normalise to `scheme://host`. Times are UTC.
+The endpoint argument is positional and optional — omit it to show every tracked endpoint. A bare domain works as well as a full URL, and matches whichever scheme was actually stored, so an http-only API is not missed. A path prefix (`api.example.com/search`) resolves to the narrowest scope covering it. Times are UTC.
 
 ## `clear`
 
@@ -95,11 +104,22 @@ With no argument it clears the whole backend — including endpoints belonging t
 
 ## `list`
 
-Currently a placeholder: enumerating stored endpoints isn't part of the storage interface yet, so the command prints a note pointing you at `status`.
+Show every endpoint scope the backend is tracking, most specific first.
 
 ```bash
-smartratelimit list
+smartratelimit --storage "sqlite:///ratelimit.db" list
 ```
+
+```
+Tracked endpoints (2):
+
+  https://api.example.com/search
+      8/10 remaining, window 0:01:00, configured
+  https://api.example.com
+      97/100 remaining, window 0:01:00, configured
+```
+
+With the default `memory` backend nothing persists between commands, so point `--storage` at the same SQLite or Redis URL your application uses.
 
 ## A working loop
 

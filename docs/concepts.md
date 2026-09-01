@@ -72,26 +72,93 @@ The stored quota and bucket live behind a small interface with three implementat
 | `sqlite:///file.db` | yes | yes, same machine | no |
 | `redis://host:port/0` | yes | yes | yes |
 
+Tokens are consumed **inside** the store as one atomic step — under the lock for
+memory, in a `BEGIN IMMEDIATE` transaction for SQLite, in a Lua script for Redis
+— so no two workers can spend the same token.
+
+## 5. Scopes
+
+A limit belongs to an **endpoint scope**: a host, optionally narrowed by a path
+prefix. `https://api.example.com` covers the whole host;
+`https://api.example.com/search` covers only paths under `/search`.
+
+Resolving a request walks from the most specific scope to the least —
+`/v1/users/42`, then `/v1/users`, then `/v1`, then the bare host — and uses the
+first one with a stored limit. That is what lets a host-wide default and a
+narrow override coexist without either knowing about the other, and it gives
+each scope its own token bucket, so exhausting `/search` leaves `/users` alone.
+
+Query strings and trailing slashes are dropped when matching: they identify a
+request, not a quota. Detected limits attach to whichever scope is governing the
+URL, but never overwrite one you set yourself — a `confidence="configured"`
+entry stands, because you set it precisely when the headers could not be
+trusted.
+
 See [Which storage backend?](choosing.md) and [Storage Backends](storage.md).
 
-!!! note "Backends fail soft"
-    If SQLite can't open its file or Redis can't be reached at construction
-    time, the limiter logs a warning and falls back to memory rather than
-    raising. Your job keeps running — with per-process limits instead of shared
-    ones. If shared state is load-bearing for you, assert it at startup:
+!!! note "Failing open is the default, not the only option"
+    An unreachable Redis fails *open*: the request goes out unpaced and a
+    warning is logged, so a limiter outage does not take your job down with it.
+    When the limit guards a paid quota that trade is wrong — pass
+    `fail_closed=True` and the limiter raises `StorageUnavailable` (a subclass
+    of `RateLimitExceeded`) instead of waving traffic through.
 
     ```python
-    from smartratelimit.storage import RedisStorage
-    RedisStorage("redis://localhost:6379/0").redis_client.ping()
+    limiter = RateLimiter(storage="redis://localhost:6379/0", fail_closed=True)
     ```
+
+    Either way it is logged. Redis is pinged at construction, because
+    `redis-py` connects lazily and an unchecked client looks healthy right up
+    until it silently stops limiting.
+
+## 6. Dimensions
+
+A scope can meter more than one thing. `requests` is universal; an LLM API also
+meters `tokens`, and the token budget is usually the one that binds — a caller
+well inside its requests-per-minute allowance still gets a 429 once
+tokens-per-minute is spent.
+
+Each dimension has its own budget and its own bucket. A request declares what it
+spends:
+
+```python
+limiter.request("POST", url, json=payload, cost={"tokens": 1500})
+```
+
+and is admitted only when **every** dimension it touches can pay. The charge is
+one atomic step across all of them, which is not a detail: charging them in turn
+would let a request spend its request allowance and then be refused for tokens,
+draining the wrong budget on every rejection. A refused request charges nothing.
+
+A dimension a request does not spend never gates it, so a `GET` with no token
+cost is not held up by an exhausted token budget.
+
+## 7. Provider profiles
+
+Detection needs a response. Some limits matter before you have one — GitHub
+allows 60 requests an hour unauthenticated, and no response tells you whether
+your credentials were accepted until you have already spent a request finding
+out.
+
+For a small set of hosts the library seeds documented limits at construction,
+marked `confidence="registry"` and replaced as soon as real headers arrive. The
+table is deliberately tiny: most providers meter per account tier, so a baked-in
+number would be a guess about *your* account, and those providers send their
+limits in headers anyway. See [Provider profiles](providers.md).
 
 ## What happens on a 429
 
 Even with pacing you can still be handed a 429 — another client on the same key, a limit the API never advertised, a burst that started before the first response taught the limiter anything.
 
-When `request()` sees a 429 with a `Retry-After` header, it sleeps for that long and **retries the request once**. If the retry also fails, the response is returned as-is for you to handle. For anything more determined than one retry, wrap the call in a [`RetryHandler`](retry.md).
+When `request()` sees a 429 (or a 503 or 504), it retries according to its `RetryConfig` — three attempts by default. A `Retry-After` header decides the wait, since the server knows when its window reopens; both the seconds form and the HTTP-date form are honoured, capped at `max_delay`. Without that header the limiter falls back to exponential backoff with jitter. If the last attempt still fails, the response is returned as-is for you to handle.
 
-Set `raise_on_limit=True` and the limiter never sleeps: it raises `RateLimitExceeded` when the bucket is empty, and returns 429 responses untouched. That's the right mode for a request handler where a slow response is worse than an error.
+```python
+from smartratelimit.retry import RetryConfig
+
+limiter = RateLimiter(retry=RetryConfig(max_retries=5, max_delay=30.0))
+```
+
+Set `raise_on_limit=True` and the limiter never sleeps: it raises `RateLimitExceeded` when the bucket is empty, and raises rather than waiting out a retryable rejection. That's the right mode for a request handler where a slow response is worse than an error.
 
 ```python
 from smartratelimit import RateLimiter, RateLimitExceeded

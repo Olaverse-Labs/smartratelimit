@@ -40,7 +40,8 @@ The `storage=` string is the one decision that matters at setup. Everything else
 | External service | none | none | Redis server |
 | Extra install | none | none | `pip install smartratelimit[redis]` |
 | Per-call cost | in-process dict | file write + fsync | one network round trip |
-| Concurrency model | `RLock` | `RLock` + SQLite locking | `RLock` + Redis |
+| Concurrency model | `RLock` | `BEGIN IMMEDIATE` transaction | Server-side Lua script |
+| Token consumption | atomic | atomic | atomic |
 
 ## Choosing in one question
 
@@ -54,13 +55,13 @@ The `storage=` string is the one decision that matters at setup. Everything else
 
 **SQLite writes on every request.** Each request reads and writes rows and commits. For a job doing a few requests per second that's invisible; for a tight loop against a very high quota it isn't free. If you're paced at 1000 requests/hour anyway, this never matters.
 
-**SQLite across processes is real but coarse.** Multiple processes on one machine do share the file, and updates are serialised by SQLite's own locking. Under heavy simultaneous writes you can see lock contention, and two workers can each read the same bucket state before either writes — the shared quota is approximate, not transactional.
+**Token accounting is atomic on every backend.** Consuming a token is one indivisible step inside the store, not a read in the client followed by a write: `MemoryStorage` does it under its lock, `SQLiteStorage` inside a `BEGIN IMMEDIATE` write transaction, `RedisStorage` in a server-side Lua script using the Redis clock. Two workers cannot both spend the same token, so the shared quota is exact rather than approximate. (Before 0.4.0 this was a client-side read-modify-write and workers did drift.)
 
-**Redis is shared but not atomic.** State lives in Redis hashes with a read-modify-write in the client, not a Lua script. Many workers still drift slightly under high concurrency. It is dramatically better than each worker guessing alone, and it is not a distributed lock.
+**SQLite serialises writers.** One writer holds the database lock at a time. Connections use WAL and a five-second busy timeout, so concurrent limiters queue rather than erroring — but a very high quota driven by many processes will feel that queue. That is the cost of the count being exact.
 
 **Redis keys expire on their own.** Rate limits get a TTL of their window plus an hour; token buckets get 24 hours. Nothing to clean up.
 
-**Both fail soft.** An unreachable Redis or an unwritable SQLite path logs a warning and falls back to memory. Check explicitly at startup if shared state is load-bearing — see the note in [How it works](concepts.md#4-storage).
+**Failure is a choice you make.** By default an unreachable Redis fails *open*: the request goes out unpaced and a warning is logged, so a limiter outage cannot take your job down with it. When the limit guards something costly — a paid API quota — that is the wrong trade, and `fail_closed=True` raises `StorageUnavailable` instead. Redis is pinged at construction rather than on your first real request, because `redis-py` connects lazily and would otherwise look healthy right up until it silently stopped limiting.
 
 ## Connection strings
 

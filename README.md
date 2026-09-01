@@ -1,7 +1,7 @@
 # smartratelimit
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/olastephen/smartratelimit/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/Olaverse-Labs/smartratelimit/blob/main/LICENSE)
 [![PyPI version](https://badge.fury.io/py/smartratelimit.svg)](https://badge.fury.io/py/smartratelimit)
 [![PyPI downloads](https://img.shields.io/pypi/dm/smartratelimit.svg)](https://pypi.org/project/smartratelimit/)
 [![Docs](https://img.shields.io/badge/docs-olaverse--labs.github.io-7C5CFF.svg)](https://olaverse-labs.github.io/smartratelimit/)
@@ -13,11 +13,14 @@ A Python library that automatically manages API rate limits, preventing 429 erro
 - 🚀 **Automatic Detection**: Automatically detects rate limits from HTTP response headers
 - 🔄 **Zero Configuration**: Works out of the box with most APIs
 - 💾 **Persistent State**: Supports in-memory, SQLite, and Redis storage
-- 🔀 **Multi-Process Safe**: Share rate limits across multiple processes with Redis
+- 🔀 **Multi-Process Safe**: SQLite and Redis backends consume tokens atomically, so workers on one box or many share one honest count
+- 🎚️ **Per-Path Limits**: Scope a limit to a path prefix — `/search` at 10/min alongside the host's 100/min — with the narrowest rule winning
+- 🧮 **Multi-Dimensional Limits**: Meter tokens per minute alongside requests per minute, charged atomically together — the budget that actually binds on LLM APIs
+- 📇 **Provider Profiles**: Documented limits for APIs that don't advertise them, so the first request isn't sent blind
 - 🎯 **Smart Waiting**: Automatically waits when limits are reached
 - 📊 **Status Monitoring**: Check current rate limit status anytime
 - 🔌 **Easy Integration**: Works with `requests`, `httpx`, and `aiohttp`
-- 🔄 **Advanced Retry**: Configurable retry strategies with exponential backoff
+- 🔄 **Advanced Retry**: Honours `Retry-After` (seconds or HTTP-date), then exponential backoff with jitter
 - 📊 **Metrics**: Built-in metrics collection and Prometheus export
 - 🛠️ **CLI Tools**: Command-line interface for monitoring and management
 
@@ -69,6 +72,24 @@ limiter = RateLimiter(storage='redis://localhost:6379/0')
 response = limiter.request('GET', 'https://api.github.com/users')
 ```
 
+#### How the shared count stays honest
+
+Sharing a *store* between workers is not the same as sharing a *limit*. If each
+worker reads the bucket, deducts a token locally and writes it back, two workers
+that read at the same moment both see 10 tokens, both write 9, and two requests
+cost one token.
+
+So the token is consumed inside the store, as one indivisible step:
+
+| Backend | Mechanism | Safe across |
+| --- | --- | --- |
+| `memory` | Consumption under the storage lock | Threads in one process |
+| `sqlite://` | `BEGIN IMMEDIATE` write transaction | Processes on one machine |
+| `redis://` | Server-side Lua script, Redis server clock | Processes on many machines |
+
+The refill-check-consume cycle never crosses a process boundary mid-flight, so a
+bucket cannot be overdrawn no matter how many workers race for it.
+
 ### With Default Limits
 
 ```python
@@ -93,7 +114,9 @@ session.headers.update({'Authorization': 'Bearer token'})
 limiter = RateLimiter()
 limiter.wrap_session(session)
 
-# Now all session requests are rate-limited
+# Now all session requests are rate-limited. The session is still the
+# transport, so its headers, cookies, auth, adapters and connection pool
+# all continue to apply.
 response = session.get('https://api.example.com/data')
 ```
 
@@ -111,6 +134,27 @@ if status:
     print(f"Remaining: {status.remaining}/{status.limit}")
     print(f"Resets in: {status.reset_in} seconds")
     print(f"Utilization: {status.utilization * 100:.1f}%")
+    print(f"Confidence: {status.confidence}")
+```
+
+### Know What Was Detected vs. Guessed
+
+Not every API tells you when its window resets. When one reports a limit but no
+usable reset header, the window has to be assumed — and a limit of `100` could
+mean 100/minute or 100/day. Rather than pass the guess off as a reading,
+`status.confidence` says where the number came from:
+
+| Value | Meaning |
+| --- | --- |
+| `'confirmed'` | The API reported both the limit and its window. |
+| `'estimated'` | The API reported a limit but no reset, so the window was assumed (one hour by default). |
+| `'configured'` | You set it yourself via `set_limit()` or `default_limits`. |
+
+```python
+status = limiter.get_status('api.example.com')
+if status.confidence == 'estimated':
+    # Replace the guess with the limit from the provider's docs
+    limiter.set_limit('api.example.com', limit=100, window='1m')
 ```
 
 ### Manual Rate Limit Configuration
@@ -124,6 +168,149 @@ limiter.set_limit('api.another.com', limit=60, window='1m')
 
 # Window formats: '1h', '30m', '60s', '1d'
 ```
+
+### Per-Endpoint Limits
+
+Most APIs do not have one limit. `GET /search` might allow 10/minute while
+`GET /users` allows 100/minute — and a single host-wide bucket forces you to
+either throttle everything to the strictest limit or blow straight through the
+tight one.
+
+Scope a limit to a path prefix and the narrowest matching rule wins:
+
+```python
+limiter = RateLimiter()
+
+limiter.set_limit('api.example.com', limit=100, window='1m')          # host-wide
+limiter.set_limit('api.example.com/search', limit=10, window='1m')    # narrower
+limiter.set_limit('api.example.com/search/bulk', limit=2, window='1m')  # narrowest
+
+limiter.request('GET', 'https://api.example.com/search/bulk?q=x')  # paced at 2/min
+limiter.request('GET', 'https://api.example.com/search?q=x')       # paced at 10/min
+limiter.request('GET', 'https://api.example.com/users')            # paced at 100/min
+```
+
+Each scope gets its own token bucket, so exhausting `/search` leaves `/users`
+untouched. Resolution walks from the full path up to the bare host and uses the
+first scope with a stored limit, so a host-wide default and a narrow override
+need not know about each other.
+
+Query strings and trailing slashes are ignored when matching — they identify a
+request, not a quota. See what is being tracked with:
+
+```python
+limiter.list_endpoints()
+# ['https://api.example.com/search/bulk',
+#  'https://api.example.com/search',
+#  'https://api.example.com']
+```
+
+A limit you set is marked `confidence="configured"` and **detection will not
+overwrite it** — you set it because the headers were absent or wrong, so header
+values do not get to overrule you.
+
+### Multi-Dimensional Limits (Tokens, Not Just Requests)
+
+Requests per minute is rarely the constraint that bites on an LLM API. OpenAI
+meters **tokens per minute** as well, and a caller comfortably inside its request
+budget still gets a 429 once the token budget is spent.
+
+Meter both, and a request has to satisfy both:
+
+```python
+limiter = RateLimiter()
+limiter.set_limit('api.openai.com', limit=3500, window='1m')                       # RPM
+limiter.set_limit('api.openai.com', limit=90000, window='1m', dimension='tokens')  # TPM
+
+response = limiter.request(
+    'POST', 'https://api.openai.com/v1/chat/completions',
+    json=payload,
+    cost={'tokens': estimated_tokens},
+)
+```
+
+`cost` says what this call spends. Omit it and the call costs one request;
+pass a mapping and every dimension named is charged. `requests` defaults to 1
+inside a mapping — a 1500-token call is still one request unless you say
+otherwise.
+
+**The charge is all-or-nothing.** Both budgets are debited in a single atomic
+step, so a request can never spend its request allowance and then be refused for
+tokens — a leak that would quietly drain the wrong budget on every rejection.
+Refused requests charge nothing at all:
+
+```python
+status = limiter.get_status('api.openai.com')
+status.dimensions['requests'].remaining   # 3495 after 5 calls
+status.dimensions['tokens'].remaining     # 80000
+```
+
+A dimension a request doesn't spend never gates it, so `GET /v1/models` with no
+`cost` isn't held up by an exhausted token budget.
+
+OpenAI's and Anthropic's token headers are detected automatically, as is the
+generic `X-RateLimit-*-Tokens` convention — you only need `set_limit` for APIs
+that don't advertise.
+
+### Provider Profiles
+
+Some limits can't be learned from a response in time to be useful. GitHub allows
+**60 requests an hour** unauthenticated — low enough that discovering it from the
+first response has already cost you a meaningful slice of the budget, and nothing
+in a response tells you whether your credentials were accepted before you send
+one.
+
+Known hosts are seeded from a built-in profile:
+
+```python
+limiter = RateLimiter()                        # seeds GitHub at 60/hour
+limiter = RateLimiter(authenticated=True)      # seeds GitHub at 5000/hour
+limiter = RateLimiter(use_provider_profiles=False)   # off
+```
+
+Seeds are marked `confidence="registry"` and are **replaced the moment the API
+reports its own numbers**. They get you a sensible first request, not a permanent
+answer.
+
+**The built-in table is deliberately tiny and should stay that way.** Most
+providers meter per account tier — OpenAI's RPM depends on which tier you're on,
+not on OpenAI — so a baked-in number would be a guess about *your* account, and a
+wrong baked-in limit is worse than none. Those providers also send their limits
+in headers, which detection already reads. An entry earns its place only when the
+number can't be detected in time *and* is a property of the API rather than of
+your account.
+
+Your own services are the natural case for adding one:
+
+```python
+from smartratelimit import Provider, SeedLimit, register_provider
+
+register_provider('internal.api', Provider(
+    name='Internal service',
+    reason='Sends no rate-limit headers; limit is in the runbook.',
+    scopes={'': [SeedLimit(25, '1m'), SeedLimit(50_000, '1m', dimension='tokens')]},
+))
+```
+
+### When the Limiter's Storage Goes Down
+
+By default an unreachable Redis fails **open**: the request goes out unpaced and
+a warning is logged. That keeps a limiter outage from taking your job down with
+it, which is right when the limit is advisory — and wrong when it guards a paid
+quota, where sending unpaced traffic is the more expensive failure.
+
+```python
+# Raise instead of sending unpaced traffic
+limiter = RateLimiter(storage='redis://localhost:6379/0', fail_closed=True)
+```
+
+With `fail_closed=True` an unreachable Redis raises `StorageUnavailable` (a
+subclass of `RateLimitExceeded`, so existing handlers keep working) at
+construction and on every acquire. Either way the failure is logged — it is
+never silent.
+
+Note that `redis-py` connects lazily, so the limiter pings Redis at construction
+rather than discovering the problem on your first real request.
 
 ### Custom Header Mapping
 
@@ -250,7 +437,7 @@ The library automatically detects rate limits from headers for:
 
 ### RateLimiter
 
-#### `__init__(storage='memory', default_limits=None, headers_map=None, raise_on_limit=False)`
+#### `__init__(storage='memory', default_limits=None, headers_map=None, raise_on_limit=False, retry=None)`
 
 Create a new rate limiter.
 
@@ -262,36 +449,91 @@ Create a new rate limiter.
 - `default_limits` (dict): Default limits when headers aren't available. Example: `{'requests_per_minute': 60}`
 - `headers_map` (dict): Custom header name mapping
 - `raise_on_limit` (bool): If `True`, raise `RateLimitExceeded` instead of waiting
+- `retry` (RetryConfig): How to retry a request the server rejects with 429/503/504.
+  Defaults to three attempts with jittered exponential backoff.
+- `fail_closed` (bool): If `True`, raise `StorageUnavailable` when shared storage
+  is unreachable instead of failing open and sending traffic unpaced.
+- `use_provider_profiles` (bool): Seed documented limits for known hosts before
+  their first response. Default `True`.
+- `authenticated` (bool): Whether requests carry credentials. Documented limits
+  often differ by orders of magnitude between anonymous and authenticated callers.
 
-#### `request(method, url, **kwargs) -> requests.Response`
+`storage` also accepts a ready-made `StorageBackend` instance, for options the
+connection string cannot express:
+
+```python
+from smartratelimit.storage import RedisStorage
+
+limiter = RateLimiter(
+    storage=RedisStorage('redis://localhost:6379/0', key_prefix='myapp:')
+)
+```
+
+```python
+from smartratelimit.retry import RetryConfig, RetryStrategy
+
+limiter = RateLimiter(
+    retry=RetryConfig(
+        max_retries=5,
+        strategy=RetryStrategy.EXPONENTIAL,
+        max_delay=30.0,   # also caps how long a Retry-After header can park you
+        jitter=0.1,
+    )
+)
+```
+
+A `Retry-After` header on the response wins over the backoff schedule — the
+server knows when its window reopens. Both the seconds form and the HTTP-date
+form are honoured, capped at `max_delay`. `RetryStrategy.NONE` means one
+attempt, no retries.
+
+#### `request(method, url, cost=None, **kwargs) -> requests.Response`
 
 Make a rate-limited HTTP request.
 
 **Parameters:**
 - `method` (str): HTTP method (GET, POST, PUT, DELETE, PATCH)
 - `url` (str): Request URL
+- `cost` (dict | number | None): What this request spends. `None` is one request;
+  a number is that many requests; a mapping like `{'tokens': 1500}` charges other
+  metered dimensions too, with `requests` defaulting to 1. Every dimension named
+  is charged atomically together.
 - `**kwargs`: Additional arguments passed to `requests.request()`
 
 **Returns:** `requests.Response` object
 
 #### `wrap_session(session: requests.Session) -> None`
 
-Wrap an existing `requests.Session` with rate limiting.
+Wrap an existing `requests.Session` with rate limiting, in place. The session
+remains the transport: its headers, cookies, auth, adapters, proxies and
+connection pool are all still used — only the scheduling of the call is taken
+over. Wrapping the same session twice is a no-op.
 
 #### `get_status(endpoint: str) -> RateLimitStatus | None`
 
-Get current rate limit status for an endpoint.
+Get current rate limit status for an endpoint. Accepts a bare domain, a full
+URL, or a domain plus path prefix; a bare domain matches whichever scheme was
+actually stored, so an http-only API is not missed.
 
 **Returns:** `RateLimitStatus` object or `None` if no info available
+
+#### `list_endpoints() -> list[str]`
+
+Every endpoint scope with a stored rate limit, most specific first.
 
 #### `set_limit(endpoint: str, limit: int, window: str = '1h') -> None`
 
 Manually set rate limit for an endpoint.
 
 **Parameters:**
-- `endpoint`: Endpoint URL or domain
-- `limit`: Maximum number of requests
-- `window`: Time window ('1h', '1m', '30s', '1d')
+- `endpoint`: Endpoint URL or domain, optionally narrowed by a path prefix
+  (`'api.example.com/search'`). The narrowest matching scope wins.
+- `limit`: Maximum units of `dimension` per window
+- `dimension`: What is being metered, default `'requests'`. Call again with
+  another name (`'tokens'`) to add a second budget to the same scope.
+- `window`: Time window ('1h', '1m', '30s', '1d'). **Raises `ValueError`** if it
+  is not a positive whole number plus `d`/`h`/`m`/`s` — a mistyped `'1.5h'`
+  silently becoming one hour is worse than a loud error at startup.
 
 #### `clear(endpoint: str | None = None) -> None`
 
@@ -310,6 +552,9 @@ Status information about current rate limits.
 - `remaining` (int): Remaining requests
 - `reset_time` (datetime): When the limit resets
 - `window` (timedelta): Time window for the limit
+- `confidence` (str): `'confirmed'`, `'estimated'`, `'configured'` or `'registry'`
+- `dimensions` (dict[str, LimitDimension]): Every metered dimension, keyed by
+  name, including `requests`
 - `reset_in` (float): Seconds until reset (property)
 - `is_exceeded` (bool): Whether limit is exceeded (property)
 - `utilization` (float): Utilization percentage 0.0-1.0 (property)
@@ -385,13 +630,13 @@ for item in items:
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](https://github.com/olastephen/smartratelimit/blob/main/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Contributions are welcome! Please read [CONTRIBUTING.md](https://github.com/Olaverse-Labs/smartratelimit/blob/main/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## License
 
 This project is licensed under the Apache License 2.0.
 
-See the [LICENSE](https://github.com/olastephen/smartratelimit/blob/main/LICENSE) file for the full license text.
+See the [LICENSE](https://github.com/Olaverse-Labs/smartratelimit/blob/main/LICENSE) file for the full license text.
 
 ## Documentation
 
@@ -413,8 +658,8 @@ The site is built with MkDocs from the [`docs/`](docs/) directory and deploys on
 ## Support
 
 - 📖 [Documentation](https://olaverse-labs.github.io/smartratelimit/)
-- 🐛 [Issue Tracker](https://github.com/olastephen/smartratelimit/issues)
-- 💬 [Discussions](https://github.com/olastephen/smartratelimit/discussions)
+- 🐛 [Issue Tracker](https://github.com/Olaverse-Labs/smartratelimit/issues)
+- 💬 [Discussions](https://github.com/Olaverse-Labs/smartratelimit/discussions)
 
 ## Acknowledgments
 

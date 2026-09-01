@@ -1,11 +1,23 @@
 """Rate limit detection from HTTP headers."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
+from requests.structures import CaseInsensitiveDict
+
+from smartratelimit._time import utcfromtimestamp, utcnow
+
+#: A rate limit read straight from the response: the server told us the limit
+#: and when it resets, so the window is a fact.
+CONFIDENCE_CONFIRMED = "confirmed"
+
+#: A rate limit where the server gave a limit but no usable reset, so the
+#: window below had to be assumed. Callers that care about correctness should
+#: treat these as a hint and configure the real limit explicitly.
+CONFIDENCE_ESTIMATED = "estimated"
 
 
 class RateLimitDetector:
@@ -60,29 +72,119 @@ class RateLimitDetector:
             "remaining": "x-ratelimit-remaining-requests",
             "reset": "x-ratelimit-reset-requests",
         },
+        "api.anthropic.com": {
+            "limit": "anthropic-ratelimit-requests-limit",
+            "remaining": "anthropic-ratelimit-requests-remaining",
+            "reset": "anthropic-ratelimit-requests-reset",
+        },
     }
 
-    def __init__(self, custom_headers_map: Optional[Dict[str, str]] = None):
+    #: Extra metered dimensions, beyond requests, for APIs that report them.
+    #:
+    #: For an LLM API the binding constraint is usually tokens per minute rather
+    #: than requests per minute: a caller well inside its request budget still
+    #: gets a 429 when the token budget is spent. Reading only the requests
+    #: headers makes the limiter confidently pace against the wrong number.
+    API_DIMENSIONS = {
+        "api.openai.com": {
+            "tokens": {
+                "limit": "x-ratelimit-limit-tokens",
+                "remaining": "x-ratelimit-remaining-tokens",
+                "reset": "x-ratelimit-reset-tokens",
+            },
+        },
+        "api.anthropic.com": {
+            "tokens": {
+                "limit": "anthropic-ratelimit-tokens-limit",
+                "remaining": "anthropic-ratelimit-tokens-remaining",
+                "reset": "anthropic-ratelimit-tokens-reset",
+            },
+            "input_tokens": {
+                "limit": "anthropic-ratelimit-input-tokens-limit",
+                "remaining": "anthropic-ratelimit-input-tokens-remaining",
+                "reset": "anthropic-ratelimit-input-tokens-reset",
+            },
+            "output_tokens": {
+                "limit": "anthropic-ratelimit-output-tokens-limit",
+                "remaining": "anthropic-ratelimit-output-tokens-remaining",
+                "reset": "anthropic-ratelimit-output-tokens-reset",
+            },
+        },
+    }
+
+    #: Header profiles for extra dimensions, tried on every host. Providers that
+    #: follow the ``*-tokens`` convention are picked up without a named profile.
+    GENERIC_DIMENSIONS = {
+        "tokens": {
+            "limit": "X-RateLimit-Limit-Tokens",
+            "remaining": "X-RateLimit-Remaining-Tokens",
+            "reset": "X-RateLimit-Reset-Tokens",
+        },
+    }
+
+    #: Window assumed when a response advertises a limit but no reset time.
+    #: There is no safe guess here -- a limit of 100 could be per minute or per
+    #: day -- so the assumption is surfaced via ``confidence`` rather than
+    #: passed off as detected fact.
+    DEFAULT_WINDOW = timedelta(hours=1)
+
+    def __init__(
+        self,
+        custom_headers_map: Optional[Dict[str, str]] = None,
+        default_window: Optional[timedelta] = None,
+    ):
         """
         Initialize detector with optional custom header mapping.
 
         Args:
             custom_headers_map: Custom mapping like {'limit': 'X-My-Limit', ...}
+            default_window: Window to assume when a response advertises a limit
+                but no reset time. Detections that fall back to it are marked
+                ``confidence='estimated'``. Defaults to one hour.
         """
         self.custom_headers_map = custom_headers_map or {}
+        self.default_window = default_window or self.DEFAULT_WINDOW
 
     def detect_from_response(
         self, response: requests.Response
     ) -> Optional[Dict[str, any]]:
         """
-        Detect rate limit information from HTTP response.
+        Detect rate limit information from an HTTP response object.
 
         Returns:
-            Dict with keys: limit, remaining, reset_time, window
-            or None if no rate limit info found
+            Dict with keys: limit, remaining, reset_time, window, confidence
+            (``'confirmed'`` when the server supplied the window, ``'estimated'``
+            when it had to be assumed) or None if no rate limit info found
         """
-        headers = response.headers
-        url = response.url
+        return self.detect(
+            response.url,
+            getattr(response, "status_code", getattr(response, "status", 200)),
+            response.headers,
+        )
+
+    def detect(
+        self, url: str, status_code: int, headers
+    ) -> Optional[Dict[str, any]]:
+        """
+        Detect rate limit information from a url, status and headers.
+
+        Takes the three pieces rather than a response object so `requests`,
+        httpx and aiohttp responses all reach identical logic -- the async
+        client used to adapt its responses separately, and a header-casing fix
+        landed on one path and not the other.
+
+        Args:
+            url: The request URL, used to pick API-specific header profiles.
+            status_code: HTTP status; 429 unlocks the ``Retry-After`` fallback.
+            headers: Response headers. Pass a case-insensitive mapping --
+                httpx lowercases names and HTTP/2 requires lowercase on the
+                wire, so a plain dict makes every lookup miss.
+
+        Returns:
+            Dict with keys: limit, remaining, reset_time, window, confidence,
+            or None if no rate limit info found.
+        """
+        headers = self._as_case_insensitive(headers)
 
         # Get domain for API-specific patterns
         domain = urlparse(url).netloc.lower()
@@ -118,20 +220,66 @@ class RateLimitDetector:
                 break
 
         # Try to extract from Retry-After on 429
-        if response.status_code == 429:
+        if status_code == 429:
             retry_after = self._find_header(headers, self.HEADER_PATTERNS["retry_after"])
             if retry_after:
                 retry_seconds = self._parse_retry_after(headers[retry_after])
-                if retry_seconds:
+                if retry_seconds is not None:
                     return {
                         "limit": None,
                         "remaining": 0,
-                        "reset_time": datetime.utcnow()
+                        "reset_time": utcnow()
                         + timedelta(seconds=retry_seconds),
                         "window": timedelta(seconds=retry_seconds),
+                        # The server named the wait explicitly.
+                        "confidence": CONFIDENCE_CONFIRMED,
                     }
 
         return None
+
+    def detect_all(self, url: str, status_code: int, headers) -> list:
+        """
+        Detect every metered dimension a response reports.
+
+        Args:
+            url: The request URL, used to pick API-specific header profiles.
+            status_code: HTTP status; 429 unlocks the ``Retry-After`` fallback.
+            headers: Response headers (any case-insensitive mapping).
+
+        Returns:
+            A list of detection dicts, each carrying a ``dimension`` key. The
+            ``requests`` dimension, when found, comes first. Empty if nothing
+            was detected.
+        """
+        headers = self._as_case_insensitive(headers)
+        domain = urlparse(url).netloc.lower()
+
+        detections = []
+
+        primary = self.detect(url, status_code, headers)
+        if primary:
+            primary.setdefault("dimension", "requests")
+            detections.append(primary)
+
+        profiles = dict(self.GENERIC_DIMENSIONS)
+        profiles.update(self.API_DIMENSIONS.get(domain, {}))
+
+        for name, pattern in profiles.items():
+            extra = self._extract_with_pattern(headers, pattern, domain)
+            if extra:
+                extra["dimension"] = name
+                detections.append(extra)
+
+        return detections
+
+    @staticmethod
+    def _as_case_insensitive(headers):
+        """Wrap headers so lookups match regardless of the casing on the wire."""
+        if headers is None:
+            return CaseInsensitiveDict()
+        if isinstance(headers, CaseInsensitiveDict):
+            return headers
+        return CaseInsensitiveDict(dict(headers))
 
     def _find_header(self, headers: Dict[str, str], candidates: list) -> Optional[str]:
         """Find first matching header from candidates."""
@@ -174,31 +322,32 @@ class RateLimitDetector:
         if remaining is None:
             remaining = limit
 
-        # If we have remaining but no reset time, estimate window
-        if reset_time is None and limit and remaining is not None:
-            # Default to 1 hour window if we can't determine
-            window = timedelta(hours=1)
-            reset_time = datetime.utcnow() + window
+        if not limit:
+            return None
 
-        if limit:
-            # Ensure we have a reset_time and window
-            if reset_time is None:
-                window = timedelta(hours=1)
-                reset_time = datetime.utcnow() + window
-            elif window is None:
-                window = reset_time - datetime.utcnow()
-                if window.total_seconds() <= 0:
-                    window = timedelta(hours=1)
-                    reset_time = datetime.utcnow() + window
+        # The server gave a limit. Whether it also gave a usable window decides
+        # how much this detection can be trusted -- a limit of 100 with no reset
+        # header could be per minute or per day, and guessing wrong either
+        # throttles the caller for nothing or lets them sail past the real limit.
+        confidence = CONFIDENCE_CONFIRMED
+        if reset_time is None:
+            confidence = CONFIDENCE_ESTIMATED
+            window = self.default_window
+            reset_time = utcnow() + window
+        elif window is None:
+            window = reset_time - utcnow()
+            if window.total_seconds() <= 0:
+                confidence = CONFIDENCE_ESTIMATED
+                window = self.default_window
+                reset_time = utcnow() + window
 
-            return {
-                "limit": limit,
-                "remaining": remaining if remaining is not None else limit,
-                "reset_time": reset_time,
-                "window": window,
-            }
-
-        return None
+        return {
+            "limit": limit,
+            "remaining": remaining,
+            "reset_time": reset_time,
+            "window": window,
+            "confidence": confidence,
+        }
 
     def _parse_reset_time(
         self, reset_value: str, domain: str
@@ -209,7 +358,7 @@ class RateLimitDetector:
             # Unix timestamps are typically > 1000000000 (year 2001+)
             seconds = int(reset_value)
             if seconds < 86400:  # Less than 1 day, treat as relative seconds
-                reset_time = datetime.utcnow() + timedelta(seconds=seconds)
+                reset_time = utcnow() + timedelta(seconds=seconds)
                 return reset_time, timedelta(seconds=seconds)
         except (ValueError, TypeError):
             pass
@@ -218,8 +367,8 @@ class RateLimitDetector:
             # Try Unix timestamp (seconds) - for larger values
             timestamp = float(reset_value)
             if timestamp > 1000000000:  # Likely a Unix timestamp
-                reset_time = datetime.utcfromtimestamp(timestamp)
-                window = reset_time - datetime.utcnow()
+                reset_time = utcfromtimestamp(timestamp)
+                window = reset_time - utcnow()
                 if window.total_seconds() > 0:  # Valid future time
                     return reset_time, window
         except (ValueError, TypeError, OSError):
@@ -228,7 +377,7 @@ class RateLimitDetector:
         try:
             # Try ISO 8601 format
             reset_time = datetime.fromisoformat(reset_value.replace("Z", "+00:00"))
-            window = reset_time - datetime.utcnow()
+            window = reset_time - utcnow()
             if window.total_seconds() > 0:  # Valid future time
                 return reset_time, window
         except (ValueError, TypeError):
@@ -237,30 +386,62 @@ class RateLimitDetector:
         # Fallback: try as relative seconds
         try:
             seconds = int(reset_value)
-            reset_time = datetime.utcnow() + timedelta(seconds=seconds)
+            reset_time = utcnow() + timedelta(seconds=seconds)
             return reset_time, timedelta(seconds=seconds)
         except (ValueError, TypeError):
             pass
 
         return None, None
 
-    def _parse_retry_after(self, retry_after: str) -> Optional[int]:
-        """Parse Retry-After header value."""
+    def _parse_retry_after(self, retry_after: str) -> Optional[float]:
+        """
+        Parse a ``Retry-After`` value into seconds.
+
+        RFC 9110 allows either a delay in seconds or an HTTP-date, and real APIs
+        send both. A date that has already passed yields 0.0, not a negative
+        wait.
+        """
+        if retry_after is None:
+            return None
+
+        value = retry_after.strip()
+
         try:
-            # Try as seconds
-            return int(retry_after)
+            return max(0.0, float(value))
         except (ValueError, TypeError):
             pass
 
-        # Try HTTP-date format (RFC 7231)
+        # HTTP-date format (RFC 9110). parsedate_to_datetime returns an aware
+        # datetime, so compare against an aware "now" -- subtracting it from a
+        # naive utcnow() raises TypeError and silently loses the header.
         try:
             from email.utils import parsedate_to_datetime
 
-            retry_date = parsedate_to_datetime(retry_after)
-            delta = retry_date - datetime.utcnow()
-            return int(delta.total_seconds())
+            retry_date = parsedate_to_datetime(value)
         except (ValueError, TypeError):
-            pass
+            return None
 
-        return None
+        if retry_date is None:
+            return None
+
+        if retry_date.tzinfo is None:
+            retry_date = retry_date.replace(tzinfo=timezone.utc)
+
+        delta = retry_date - datetime.now(timezone.utc)
+        return max(0.0, delta.total_seconds())
+
+    def retry_after_seconds(self, headers: Dict[str, str]) -> Optional[float]:
+        """
+        Read the server's requested wait from a response's headers.
+
+        Args:
+            headers: Response headers (any case-insensitive mapping).
+
+        Returns:
+            Seconds to wait, or None if no usable ``Retry-After`` is present.
+        """
+        header = self._find_header(headers, self.HEADER_PATTERNS["retry_after"])
+        if header is None:
+            return None
+        return self._parse_retry_after(headers[header])
 

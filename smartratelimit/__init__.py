@@ -6,17 +6,23 @@ across multiple processes and application restarts.
 """
 
 from smartratelimit.async_client import AsyncRateLimiter
-from smartratelimit.core import RateLimiter, RateLimitExceeded
+from smartratelimit.core import RateLimiter, RateLimitExceeded, StorageUnavailable
 from smartratelimit.metrics import MetricsCollector
-from smartratelimit.models import RateLimitStatus
+from smartratelimit.models import LimitDimension, RateLimitStatus
+from smartratelimit.providers import Provider, SeedLimit, register_provider
 from smartratelimit.retry import RetryConfig, RetryHandler, RetryStrategy
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 __all__ = [
     "RateLimiter",
     "AsyncRateLimiter",
     "RateLimitStatus",
+    "LimitDimension",
+    "Provider",
+    "SeedLimit",
+    "register_provider",
     "RateLimitExceeded",
+    "StorageUnavailable",
     "RetryConfig",
     "RetryHandler",
     "RetryStrategy",

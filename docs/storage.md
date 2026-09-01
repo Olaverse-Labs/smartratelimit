@@ -109,34 +109,41 @@ limiter._storage = RedisStorage(
 )
 ```
 
-!!! note "`storage=` takes a string, not an object"
-    The constructor parses a connection string; it does not accept a backend
-    instance. Assigning to `limiter._storage` after construction is the current
-    way to install a pre-built backend, and `_storage` is private — it may
-    change between releases. For the three standard backends, prefer the string.
+!!! note "`storage=` takes a string **or** a backend instance"
+    The connection string covers the common cases. For options it cannot
+    express — a custom Redis `key_prefix`, a backend of your own — pass a
+    constructed `StorageBackend` instead:
 
-### Verifying the connection
+    ```python
+    from smartratelimit.storage import RedisStorage
 
-Construction falls back to memory on failure rather than raising, so check explicitly if shared state matters:
+    limiter = RateLimiter(
+        storage=RedisStorage("redis://localhost:6379/0", key_prefix="myapp:")
+    )
+    ```
+
+### When the backend is unreachable
+
+`redis-py` connects lazily, so the limiter pings Redis at construction rather than discovering the problem on your first real request. What happens next is your call:
 
 ```python
-from smartratelimit.storage import RedisStorage
+# Default: fail open. Requests go out unpaced, loudly logged.
+limiter = RateLimiter(storage="redis://localhost:6379/0")
 
-try:
-    RedisStorage("redis://localhost:6379/0").redis_client.ping()
-    print("✓ Redis reachable — limits are shared")
-except Exception as e:
-    raise SystemExit(f"✗ Redis unavailable: {e}")
+# Fail closed. Raises StorageUnavailable rather than sending unpaced traffic.
+limiter = RateLimiter(storage="redis://localhost:6379/0", fail_closed=True)
 ```
 
-Redis operations at runtime also degrade quietly: a read that fails returns `None` (treated as "no limit known") and a write that fails is dropped. The job keeps going; the pacing gets less accurate.
+Failing open is right when the limit is advisory — a limiter outage should not take your job down with it. It is wrong when the limit guards a paid quota, where unpaced traffic is the more expensive failure. `StorageUnavailable` subclasses `RateLimitExceeded`, so handlers you already have keep working.
+
+The client is kept either way rather than being swapped for memory storage, so a Redis that is briefly down at boot resumes sharing limits when it returns. Runtime read and write failures are logged: a failed read is treated as "no limit known", a failed write is dropped, and a failed `acquire` either fails open with a warning or raises, per `fail_closed`. Nothing is silent.
 
 ## Writing your own backend
 
-Subclass `StorageBackend` and implement five methods:
+Subclass `StorageBackend` and implement seven methods:
 
 ```python
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from smartratelimit.storage import StorageBackend
 from smartratelimit.models import RateLimit, TokenBucket
@@ -148,20 +155,34 @@ class DynamoStorage(StorageBackend):
     def get_token_bucket(self, key: str) -> Optional[TokenBucket]: ...
     def set_token_bucket(self, key: str, bucket: TokenBucket) -> None: ...
     def clear(self, endpoint: Optional[str] = None) -> None: ...
+    def list_endpoints(self) -> List[str]: ...
+
+    def acquire(
+        self,
+        key: str,
+        capacity: float,
+        refill_rate: float,
+        tokens: float = 1.0,
+    ) -> Tuple[bool, float]: ...
 ```
+
+**`acquire` is the one that matters.** It must refill the bucket and consume from it as a single indivisible operation, against however many callers your backend can have at once. Building it out of `get_token_bucket` / mutate / `set_token_bucket` is not a substitute: two callers read the same token count, both write it back one lower, and two requests cost one token. Use whatever your store gives you — a transaction, a compare-and-swap, a server-side script.
+
+Return `(True, 0.0)` when the tokens were consumed, and `(False, seconds_to_wait)` when they were not — with nothing consumed. Return `float("inf")` as the wait if the bucket can never refill.
 
 Contract notes:
 
-- `endpoint` keys are `scheme://host`; bucket keys are `scheme://host:default`
+- `endpoint` keys are endpoint scopes: `scheme://host`, optionally with a path prefix (`https://api.example.com/search`). Bucket keys are that scope plus `:default`.
 - Getters return `None` when nothing is stored — never raise for a miss
 - `clear(endpoint)` must also remove that endpoint's bucket keys; `clear(None)` removes everything
-- Assume concurrent calls from multiple threads
+- `list_endpoints()` returns every scope with a stored limit; the CLI's `list` reads it
+- Optionally override `get_rate_limit_for(candidates)` to resolve a scope in one round trip. The default walks the list calling `get_rate_limit`, which costs a query per path segment on a remote store. Candidates arrive most-specific-first and that order is the precedence order.
+- Assume concurrent calls from multiple threads, and — if your store is shared — from multiple processes
 
-Then attach it:
+Then pass it in:
 
 ```python
-limiter = RateLimiter()
-limiter._storage = DynamoStorage(...)
+limiter = RateLimiter(storage=DynamoStorage(...))
 ```
 
 ## Clearing state

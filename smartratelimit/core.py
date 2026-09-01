@@ -2,31 +2,41 @@
 
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict, Optional
-from urllib.parse import urlparse
 
 import requests
 
-from smartratelimit.detector import RateLimitDetector
-from smartratelimit.models import RateLimit, RateLimitStatus, TokenBucket
-from smartratelimit.storage import (
-    MemoryStorage,
-    RedisStorage,
-    SQLiteStorage,
-    StorageBackend,
+from smartratelimit._base import (  # noqa: F401  (re-exported for callers)
+    LimiterBase,
+    RateLimitExceeded,
+    StorageUnavailable,
 )
+from smartratelimit.models import REQUESTS
+from smartratelimit.retry import RetryConfig
 
 logger = logging.getLogger(__name__)
 
 
-class RateLimitExceeded(Exception):
-    """Exception raised when rate limit is exceeded and raise_on_limit=True."""
+class _OriginalRequestSession:
+    """
+    Minimal session-alike that calls a wrapped session's original ``request``.
 
-    pass
+    :meth:`RateLimiter.wrap_session` replaces ``session.request`` in place, so
+    the limiter needs a handle on the pre-wrap bound method to issue the actual
+    call -- otherwise it would call its own wrapper and recurse.
+    """
+
+    __slots__ = ("_request",)
+
+    def __init__(self, request):
+        self._request = request
+
+    def request(self, method, url, **kwargs):
+        return self._request(method, url, **kwargs)
 
 
-class RateLimiter:
+class RateLimiter(LimiterBase):
     """
     Main rate limiter class that automatically manages API rate limits.
 
@@ -43,202 +53,123 @@ class RateLimiter:
         default_limits: Optional[Dict[str, int]] = None,
         headers_map: Optional[Dict[str, str]] = None,
         raise_on_limit: bool = False,
+        retry: Optional[RetryConfig] = None,
+        fail_closed: bool = False,
+        use_provider_profiles: bool = True,
+        authenticated: bool = False,
     ):
         """
         Initialize rate limiter.
 
         Args:
-            storage: Storage backend ('memory', 'sqlite:///path', 'redis://host:port')
+            storage: Storage backend ('memory', 'sqlite:///path', 'redis://host:port'),
+                or a ready-made StorageBackend instance
             default_limits: Default limits like {'requests_per_second': 10}
             headers_map: Custom header name mapping
             raise_on_limit: If True, raise exception instead of waiting
+            retry: How to retry a request the server rejects with 429/503/504.
+                Defaults to three attempts with jittered exponential backoff.
+            fail_closed: If True, raise when shared storage is unreachable
+                instead of silently falling back to per-process limits.
+            use_provider_profiles: Seed documented limits for known hosts before
+                their first response. Seeds are marked ``confidence='registry'``
+                and replaced as soon as the API reports its own numbers.
+            authenticated: Whether requests carry credentials. Documented limits
+                often differ by orders of magnitude between anonymous and
+                authenticated callers, and no response says which you are before
+                you send one.
         """
-        self._storage = self._create_storage(storage)
-        self._detector = RateLimitDetector(headers_map)
-        self._default_limits = default_limits or {}
-        self._raise_on_limit = raise_on_limit
+        super().__init__(
+            storage=storage,
+            default_limits=default_limits,
+            headers_map=headers_map,
+            raise_on_limit=raise_on_limit,
+            retry=retry,
+            fail_closed=fail_closed,
+            use_provider_profiles=use_provider_profiles,
+            authenticated=authenticated,
+        )
         self._session = requests.Session()
 
-    def _create_storage(self, storage: str) -> StorageBackend:
-        """Create storage backend from string specification."""
-        if storage == "memory":
-            return MemoryStorage()
+    def _acquire(self, scope: str, limit: int, window: timedelta, cost=None) -> None:
+        """
+        Block until this request's budget has been consumed, or raise.
 
-        if storage.startswith("sqlite://"):
-            db_path = storage.replace("sqlite://", "", 1)
-            # Handle different sqlite:// formats
-            if db_path.startswith("///"):
-                # sqlite:///absolute/path -> /absolute/path
-                db_path = db_path[2:]
-            elif db_path.startswith("//"):
-                # sqlite:////absolute/path (4 slashes) -> /absolute/path
-                db_path = db_path[1:]
-            elif db_path == "/:memory:":
-                # sqlite:///:memory: -> :memory:
-                db_path = ":memory:"
-            elif db_path.startswith("/"):
-                # sqlite:///relative/path -> /relative/path (keep as is)
-                pass
-            elif not db_path:
-                # sqlite:// -> :memory:
-                db_path = ":memory:"
-            try:
-                return SQLiteStorage(db_path=db_path)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to initialize SQLite storage: {e}, falling back to memory"
-                )
-                return MemoryStorage()
+        Kept for callers holding a single limit and window. The request path
+        uses :meth:`_acquire_limit`, which honours every dimension of a scope.
+        """
+        window_seconds = window.total_seconds() if window else 0.0
+        if limit <= 0 or window_seconds <= 0:
+            return
 
-        if storage.startswith("redis://"):
-            try:
-                return RedisStorage(redis_url=storage)
-            except ImportError as e:
-                logger.warning(
-                    f"Redis package not installed: {e}, falling back to memory"
-                )
-                return MemoryStorage()
-            except Exception as e:
-                logger.warning(
-                    f"Failed to initialize Redis storage: {e}, falling back to memory"
-                )
-                return MemoryStorage()
+        capacity = float(limit)
+        amount = self._normalize_cost(cost)[REQUESTS]
+        self._spend(
+            scope,
+            [(self._get_bucket_key(scope), capacity, capacity / window_seconds, amount)],
+        )
 
-        raise ValueError(f"Unknown storage backend: {storage}")
+    def _acquire_limit(self, rate_limit, cost=None) -> None:
+        """Block until every dimension this request spends has been charged."""
+        specs = self._acquire_specs(rate_limit, cost)
+        if specs:
+            self._spend(rate_limit.endpoint, specs)
 
-    @staticmethod
-    def _get_endpoint_key(url: str) -> str:
-        """Extract endpoint key from URL."""
-        parsed = urlparse(url)
-        return f"{parsed.scheme}://{parsed.netloc}"
+    def _spend(self, scope: str, specs) -> None:
+        """
+        Charge the buckets in ``specs``, waiting for capacity if needed.
 
-    def _get_bucket_key(self, url: str, limit_type: str = "default") -> str:
-        """Get token bucket key for URL."""
-        endpoint = self._get_endpoint_key(url)
-        return f"{endpoint}:{limit_type}"
+        Consumption happens inside the storage backend as one atomic step --
+        across every bucket at once when there is more than one, so a request
+        never spends its request budget only to be refused for tokens.
 
-    def _get_or_create_bucket(
-        self, url: str, limit: int, window: timedelta
-    ) -> TokenBucket:
-        """Get or create token bucket for URL."""
-        key = self._get_bucket_key(url)
-        bucket = self._storage.get_token_bucket(key)
+        Args:
+            scope: Endpoint scope key, for messages and logs.
+            specs: ``(key, capacity, refill_rate, tokens)`` per bucket.
 
-        if bucket is None:
-            # Create new bucket
-            capacity = float(limit)
-            refill_rate = capacity / window.total_seconds()
-            bucket = TokenBucket(
-                capacity=capacity,
-                tokens=capacity,
-                refill_rate=refill_rate,
-            )
-            self._storage.set_token_bucket(key, bucket)
-        else:
-            # Update refill rate if limit changed
-            window_seconds = window.total_seconds()
-            if window_seconds > 0:
-                bucket.refill_rate = float(limit) / window_seconds
-                bucket.capacity = float(limit)
+        Raises:
+            RateLimitExceeded: If ``raise_on_limit`` is set and the budget is
+                not available, or if a bucket can never refill.
+        """
+        for _ in range(self.MAX_WAIT_ATTEMPTS):
+            allowed, wait_time = self._storage.acquire_many(specs)
+            if allowed:
+                return
 
-        return bucket
-
-    def _wait_for_token(self, bucket: TokenBucket, url: str) -> None:
-        """Wait until token is available."""
-        wait_time = bucket.wait_time()
-        if wait_time > 0:
             if self._raise_on_limit:
                 raise RateLimitExceeded(
-                    f"Rate limit exceeded for {url}. Wait {wait_time:.2f} seconds."
+                    f"Rate limit exceeded for {scope}. Wait {wait_time:.2f} seconds."
+                )
+
+            if wait_time == float("inf"):
+                raise RateLimitExceeded(
+                    f"Rate limit for {scope} can never be satisfied: "
+                    f"the bucket does not refill."
                 )
 
             logger.info(
-                f"Rate limit reached for {url}, waiting {wait_time:.2f} seconds"
+                "Rate limit reached for %s, waiting %.2f seconds", scope, wait_time
             )
-            time.sleep(wait_time)
+            # Another worker may take the capacity we waited for, so loop rather
+            # than assuming one wait is enough.
+            time.sleep(max(wait_time, 0.001))
 
-        # Consume token
-        bucket.refill()
-        if not bucket.consume():
-            # Should not happen after wait, but handle edge case
-            time.sleep(0.1)
-            bucket.refill()
-            bucket.consume()
-
-    def _update_from_response(self, response: requests.Response) -> None:
-        """Update rate limit info from response headers."""
-        detected = self._detector.detect_from_response(response)
-        if not detected:
-            return
-
-        endpoint = self._get_endpoint_key(response.url)
-        limit = detected.get("limit")
-        remaining = detected.get("remaining")
-        reset_time = detected.get("reset_time")
-        window = detected.get("window")
-
-        if limit and reset_time and window:
-            rate_limit = RateLimit(
-                endpoint=endpoint,
-                limit=limit,
-                remaining=remaining or limit,
-                reset_time=reset_time,
-                window=window,
-            )
-            self._storage.set_rate_limit(endpoint, rate_limit)
-
-            # Update or create token bucket
-            bucket = self._get_or_create_bucket(endpoint, limit, window)
-            # Adjust tokens based on remaining
-            if remaining is not None:
-                bucket.tokens = min(bucket.capacity, float(remaining))
-                bucket.last_update = datetime.utcnow()
-
-            logger.debug(
-                f"Rate limit updated for {endpoint}: {remaining}/{limit} remaining"
-            )
-
-    def _apply_default_limits(self, url: str) -> None:
-        """Apply default limits if no rate limit info exists."""
-        if not self._default_limits:
-            return
-
-        endpoint = self._get_endpoint_key(url)
-
-        # Check if we already have rate limit info
-        if self._storage.get_rate_limit(endpoint):
-            return
-
-        # Apply defaults
-        if "requests_per_second" in self._default_limits:
-            limit = self._default_limits["requests_per_second"]
-            window = timedelta(seconds=1)
-        elif "requests_per_minute" in self._default_limits:
-            limit = self._default_limits["requests_per_minute"]
-            window = timedelta(minutes=1)
-        elif "requests_per_hour" in self._default_limits:
-            limit = self._default_limits["requests_per_hour"]
-            window = timedelta(hours=1)
-        else:
-            return
-
-        # Create default rate limit
-        rate_limit = RateLimit(
-            endpoint=endpoint,
-            limit=limit,
-            remaining=limit,
-            reset_time=datetime.utcnow() + window,
-            window=window,
+        raise RateLimitExceeded(
+            f"Could not acquire capacity for {scope} after "
+            f"{self.MAX_WAIT_ATTEMPTS} attempts; the endpoint is saturated."
         )
-        self._storage.set_rate_limit(endpoint, rate_limit)
 
-    def request(self, method: str, url: str, **kwargs) -> requests.Response:
+    def request(self, method: str, url: str, cost=None, **kwargs) -> requests.Response:
         """
         Make a rate-limited HTTP request.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, PATCH)
             url: Request URL
+            cost: What this request spends. Omit for one request. Pass a mapping
+                to charge other metered dimensions too — ``cost={'tokens': 1500}``
+                for an LLM call — and the request waits until every budget it
+                touches can pay.
             **kwargs: Additional arguments passed to requests.request()
 
         Returns:
@@ -247,59 +178,64 @@ class RateLimiter:
         Raises:
             RateLimitExceeded: If raise_on_limit=True and limit is exceeded
         """
-        endpoint = self._get_endpoint_key(url)
+        return self._request(method, url, self._session, cost=cost, **kwargs)
 
-        # Apply default limits if configured
-        self._apply_default_limits(url)
+    def _request(self, method: str, url: str, session, cost=None, **kwargs) -> requests.Response:
+        """
+        Rate-limit and issue a request on a specific transport.
 
-        # Get rate limit info
-        rate_limit = self._storage.get_rate_limit(endpoint)
+        Args:
+            method: HTTP method.
+            url: Request URL.
+            session: Object with a ``request(method, url, **kwargs)`` method that
+                performs the call. :meth:`wrap_session` passes the caller's own
+                session here so its cookies, auth and adapters are preserved.
+            **kwargs: Forwarded to the transport.
+        """
+        max_attempts = self._retry.max_attempts()
 
-        if rate_limit:
-            # Use detected rate limits
-            bucket = self._get_or_create_bucket(
-                endpoint, rate_limit.limit, rate_limit.window
-            )
-            self._wait_for_token(bucket, url)
-        elif self._default_limits:
-            # Use default limits
+        for attempt in range(1, max_attempts + 1):
+            # Both are (re)applied each attempt because a 429 may have taught
+            # us a real limit in the meantime.
+            self._apply_provider_profile(url)
             self._apply_default_limits(url)
-            rate_limit = self._storage.get_rate_limit(endpoint)
+
+            rate_limit = self._resolve_limit(url)
             if rate_limit:
-                bucket = self._get_or_create_bucket(
-                    endpoint, rate_limit.limit, rate_limit.window
+                self._acquire_limit(rate_limit, cost)
+
+            response = session.request(method, url, **kwargs)
+            self._record_response(url, response.status_code, response.headers)
+
+            if response.status_code not in self._retry.config.retry_on_status:
+                return response
+
+            if attempt >= max_attempts:
+                # Out of attempts: hand the caller the server's own answer
+                # rather than an exception it cannot inspect.
+                logger.warning(
+                    "Giving up on %s after %d attempts (last status %s)",
+                    url,
+                    attempt,
+                    response.status_code,
                 )
-                self._wait_for_token(bucket, url)
+                return response
 
-        # Make the request
-        response = self._session.request(method, url, **kwargs)
+            wait_time = self._retry_delay(response.headers, attempt)
+            if self._raise_on_limit:
+                raise RateLimitExceeded(
+                    f"{url} returned {response.status_code}. "
+                    f"Retry after {wait_time:.2f} seconds."
+                )
 
-        # Update rate limit info from response
-        self._update_from_response(response)
-
-        # Handle 429 responses
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    wait_time = int(retry_after)
-                    logger.warning(
-                        f"Received 429 for {url}, waiting {wait_time} seconds"
-                    )
-                    if not self._raise_on_limit:
-                        time.sleep(wait_time)
-                        # Retry once
-                        response = self._session.request(method, url, **kwargs)
-                        self._update_from_response(response)
-                except (ValueError, TypeError):
-                    pass
-
-        # Save bucket state
-        if rate_limit:
-            bucket = self._get_or_create_bucket(
-                endpoint, rate_limit.limit, rate_limit.window
+            logger.warning(
+                "Received %s for %s, waiting %.2f seconds before attempt %d",
+                response.status_code,
+                url,
+                wait_time,
+                attempt + 1,
             )
-            self._storage.set_token_bucket(self._get_bucket_key(endpoint), bucket)
+            time.sleep(wait_time)
 
         return response
 
@@ -308,105 +244,22 @@ class RateLimiter:
         Wrap an existing requests.Session with rate limiting.
 
         This modifies the session object in-place by wrapping its request method.
+        The session stays the transport: its cookies, headers, auth, adapters,
+        proxies and connection pool are all still used. Only the scheduling of
+        the call is taken over.
 
         Args:
             session: requests.Session object to wrap
         """
-        original_request = session.request
+        if getattr(session, "_smartratelimit_wrapped", False):
+            return
 
-        def rate_limited_request(method, url, **kwargs):
-            return self.request(method, url, **kwargs)
+        transport = _OriginalRequestSession(session.request)
+
+        def rate_limited_request(method, url, cost=None, **kwargs):
+            # Route through the limiter, but let it issue the call on this
+            # session rather than on the limiter's own.
+            return self._request(method, url, transport, cost=cost, **kwargs)
 
         session.request = rate_limited_request
-
-    def get_status(self, endpoint: str) -> Optional[RateLimitStatus]:
-        """
-        Get current rate limit status for an endpoint.
-
-        Args:
-            endpoint: Endpoint URL or domain
-
-        Returns:
-            RateLimitStatus object or None if no info available
-        """
-        # Normalize endpoint
-        if not endpoint.startswith(("http://", "https://")):
-            endpoint = f"https://{endpoint}"
-
-        endpoint_key = self._get_endpoint_key(endpoint)
-        rate_limit = self._storage.get_rate_limit(endpoint_key)
-
-        if rate_limit:
-            return rate_limit.to_status()
-
-        return None
-
-    def set_limit(
-        self, endpoint: str, limit: int, window: str = "1h"
-    ) -> None:
-        """
-        Manually set rate limit for an endpoint.
-
-        Args:
-            endpoint: Endpoint URL or domain
-            limit: Maximum number of requests
-            window: Time window (e.g., '1h', '1m', '30s', '1d')
-        """
-        # Normalize endpoint
-        if not endpoint.startswith(("http://", "https://")):
-            endpoint = f"https://{endpoint}"
-
-        endpoint_key = self._get_endpoint_key(endpoint)
-
-        # Parse window
-        window_td = self._parse_window(window)
-
-        rate_limit = RateLimit(
-            endpoint=endpoint_key,
-            limit=limit,
-            remaining=limit,
-            reset_time=datetime.utcnow() + window_td,
-            window=window_td,
-        )
-
-        self._storage.set_rate_limit(endpoint_key, rate_limit)
-
-    def _parse_window(self, window: str) -> timedelta:
-        """Parse window string to timedelta."""
-        window = window.strip().lower()
-
-        # Match patterns like "1h", "30m", "60s", "1d"
-        match = None
-        for pattern in ["d", "h", "m", "s"]:
-            if window.endswith(pattern):
-                try:
-                    value = int(window[:-1])
-                    if pattern == "d":
-                        return timedelta(days=value)
-                    elif pattern == "h":
-                        return timedelta(hours=value)
-                    elif pattern == "m":
-                        return timedelta(minutes=value)
-                    elif pattern == "s":
-                        return timedelta(seconds=value)
-                except ValueError:
-                    pass
-
-        # Default to 1 hour
-        return timedelta(hours=1)
-
-    def clear(self, endpoint: Optional[str] = None) -> None:
-        """
-        Clear stored rate limit data.
-
-        Args:
-            endpoint: Specific endpoint to clear, or None to clear all
-        """
-        if endpoint:
-            if not endpoint.startswith(("http://", "https://")):
-                endpoint = f"https://{endpoint}"
-            endpoint_key = self._get_endpoint_key(endpoint)
-            self._storage.clear(endpoint_key)
-        else:
-            self._storage.clear()
-
+        session._smartratelimit_wrapped = True

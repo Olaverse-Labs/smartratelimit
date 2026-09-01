@@ -31,34 +31,52 @@ Synchronous limiter built on `requests`.
 | `default_limits` | `dict \| None` | `None` | Fallback limit when nothing is detected — one of `requests_per_second`, `requests_per_minute`, `requests_per_hour` |
 | `headers_map` | `dict \| None` | `None` | Custom header names: keys `limit`, `remaining`, `reset` |
 | `raise_on_limit` | `bool` | `False` | Raise `RateLimitExceeded` instead of waiting |
+| `retry` | `RetryConfig \| None` | `None` | How to retry a 429/503/504. Defaults to three attempts with jittered exponential backoff |
+| `fail_closed` | `bool` | `False` | Raise `StorageUnavailable` when shared storage is unreachable, instead of failing open and sending traffic unpaced |
+| `use_provider_profiles` | `bool` | `True` | Seed documented limits for known hosts before their first response — see [Provider Profiles](providers.md) |
+| `authenticated` | `bool` | `False` | Whether requests carry credentials. Documented limits often differ by orders of magnitude between anonymous and authenticated callers |
 
-Raises `ValueError` for an unrecognised storage string. A SQLite or Redis backend that fails to initialise logs a warning and falls back to memory.
+Raises `ValueError` for an unrecognised storage string. `storage` also accepts a ready-made `StorageBackend` instance for options the connection string cannot express, such as a custom Redis `key_prefix`.
+
+A SQLite backend that cannot open its file logs a warning and falls back to memory. An unreachable Redis is kept — and warned about at construction — so it recovers on its own when Redis returns. With `fail_closed=True` both raise instead.
 
 If `default_limits` contains more than one key, the shortest window present wins (`second` → `minute` → `hour`) and the rest are ignored.
 
-### `.request(method, url, **kwargs) -> requests.Response`
+### `.request(method, url, cost=None, **kwargs) -> requests.Response`
 
 Make a paced request. `**kwargs` are passed through to `requests.request()`.
 
-Waits (or raises, with `raise_on_limit=True`) when the endpoint's bucket is empty, then updates the stored quota from the response headers. On a 429 carrying `Retry-After`, sleeps and retries **once** unless `raise_on_limit=True`.
+`cost` says what this request spends. `None` is one request; a number is that many requests; a mapping such as `{"tokens": 1500}` charges other [metered dimensions](concepts.md#6-dimensions) too, with `requests` defaulting to 1 inside it. Every dimension named is charged in one atomic step — a request never spends its request allowance and is then refused for tokens.
+
+Waits (or raises, with `raise_on_limit=True`) when the endpoint's bucket is empty, then updates the stored quota from the response headers.
+
+A 429, 503 or 504 is retried per the `retry` config. `Retry-After` decides the wait when present — seconds or HTTP-date, capped at `max_delay` — otherwise exponential backoff with jitter applies. When the attempts run out the last response is returned as-is. With `raise_on_limit=True` a retryable rejection raises `RateLimitExceeded` instead of being waited out.
 
 ### `.wrap_session(session) -> None`
 
 Replace `session.request` with a paced version, in place. Returns `None`.
 
-The wrapped calls are issued through the limiter's own internal session, so headers, auth and cookies configured on your session are **not** applied — pass them per call instead.
+Your session stays the transport: its headers, cookies, auth, adapters, proxies and connection pool all continue to apply. Only the scheduling of the call is taken over. Wrapping the same session twice is a no-op.
 
 ### `.get_status(endpoint) -> RateLimitStatus | None`
 
-Current stored status for an endpoint. Accepts a bare domain or a full URL; both normalise to `scheme://host`. Returns `None` when nothing has been detected or set.
+Current stored status for an endpoint. Accepts a bare domain, a full URL, or a domain plus path prefix, and resolves to the narrowest scope governing it. A bare domain matches whichever scheme was actually stored, so an http-only API is not missed. Returns `None` when nothing has been detected or set.
 
 ### `.set_limit(endpoint, limit, window="1h") -> None`
 
 Store a limit explicitly, without waiting to detect one.
 
-`window` is a whole number plus a unit — `"30s"`, `"15m"`, `"1h"`, `"1d"`. Anything unparseable (including a decimal like `"1.5h"`) silently falls back to one hour.
+`dimension` (default `"requests"`) is what is being metered. Call `set_limit` again with another name to add a second budget to the same scope; a request then has to satisfy both.
 
-A subsequently detected limit from response headers replaces what you set.
+`endpoint` is a domain or URL, optionally narrowed by a path prefix — `"api.example.com"` covers the host, `"api.example.com/search"` covers only paths under `/search` and takes precedence there. Each scope gets its own bucket.
+
+`window` is a positive whole number plus a unit — `"30s"`, `"15m"`, `"1h"`, `"1d"`. Anything else, including a decimal like `"1.5h"`, raises `ValueError`: a mistyped window silently becoming one hour paces you against a limit you never asked for, with nothing to tell you.
+
+What you set is marked `confidence="configured"`, and **detected headers will not overwrite it** — you set it because the headers were absent or wrong.
+
+### `.list_endpoints() -> list[str]`
+
+Every endpoint scope with a stored rate limit, most specific first.
 
 ### `.clear(endpoint=None) -> None`
 

@@ -103,6 +103,7 @@ nav:
     - Which storage backend?: choosing.md
   - Guides:
     - Detection & Headers: detection.md
+    - Provider Profiles: providers.md
     - Storage Backends: storage.md
     - Async (httpx / aiohttp): async.md
     - Retry Strategies: retry.md

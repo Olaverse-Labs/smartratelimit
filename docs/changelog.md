@@ -4,6 +4,143 @@ All notable changes to smartratelimit. The format follows [Keep a Changelog](htt
 
 Current release: **v{{ smartratelimit_version }}**
 
+## 0.4.0
+
+### Fixed
+
+- **Persistent backends did not rate limit at all.** `request()` consumed a
+  token from an in-memory copy of the bucket, then re-read the bucket from
+  storage before saving it — discarding the consumption. With `sqlite://` or
+  `redis://` every request found a full bucket, so the limiter never throttled
+  anything. It only appeared to work with `memory` storage, where the "copy" is
+  the same object. Consumption now happens inside the storage backend.
+- **Concurrent workers could overdraw a shared bucket.** Even with the
+  write-back fixed, `get` / modify / `set` loses updates: two workers read 10
+  tokens, both write 9, and two requests cost one token. Storage backends now
+  expose an atomic `acquire()` — `MemoryStorage` under its lock,
+  `SQLiteStorage` inside a `BEGIN IMMEDIATE` transaction, `RedisStorage` as a
+  server-side Lua script — so the "multi-process safe" claim holds for real.
+- **`Retry-After` as an HTTP-date was silently ignored.** Parsing the date form
+  raised `TypeError` comparing an aware datetime to a naive one, which was
+  caught and treated as "no header". Both forms now parse; a date already in the
+  past yields 0 rather than a negative wait.
+- **A 429 was retried at most once**, and only when `Retry-After` parsed as an
+  integer. Requests now retry per `RetryConfig`, preferring the server's
+  `Retry-After` and falling back to exponential backoff.
+- **`wrap_session()` discarded the session it was given**, routing calls through
+  the limiter's own private session and dropping the caller's headers, cookies,
+  auth, adapters, proxies and connection pool. The session is now the transport.
+- `MemoryStorage` cleanup raised `TypeError` on a stored limit with no reset
+  time.
+
+### Added
+- **Multi-dimensional limits with per-request cost.** A scope can now meter more
+  than requests. `set_limit(..., dimension="tokens")` adds a second budget, and
+  `request(..., cost={"tokens": 1500})` says what a call spends; it is admitted
+  only when every dimension it touches can pay. This is the constraint that
+  actually binds on LLM APIs — a caller well inside its requests-per-minute
+  allowance still gets a 429 once tokens-per-minute is spent, and pacing against
+  requests alone paced against the wrong number.
+
+  The charge is **atomic across every bucket**: `StorageBackend.acquire_many()`
+  debits all of them or none. Charging in turn would let a request spend its
+  request allowance and then be refused for tokens, draining the wrong budget on
+  every rejection. Implemented as one lock for memory, one `BEGIN IMMEDIATE`
+  transaction for SQLite, and one multi-key Lua script for Redis. A dimension a
+  request does not spend never gates it.
+
+  OpenAI and Anthropic token headers are detected automatically, as is the
+  generic `X-RateLimit-*-Tokens` convention. The detector previously read only
+  `x-ratelimit-limit-requests` from OpenAI and ignored the token headers
+  entirely.
+- **Provider profiles** for limits detection cannot reach in time.
+  `RateLimiter()` seeds documented limits for known hosts before their first
+  response; `authenticated=True` selects the credentialed numbers, since no
+  response tells you which side you are on before you send one. GitHub's
+  unauthenticated 60-per-hour is the motivating case — low enough that learning
+  it from the first response has already cost a meaningful slice of the budget.
+
+  Seeds carry `confidence="registry"` and are replaced as soon as the API
+  reports its own numbers; an explicitly configured limit still outranks both.
+  Disable with `use_provider_profiles=False`.
+
+  **The built-in table is deliberately tiny and a test enforces that.** Most
+  providers meter per account tier, so a baked-in number is a guess about the
+  caller's account — and a wrong baked-in limit is worse than none. OpenAI,
+  Anthropic and Stripe are excluded for exactly this reason; their limits come
+  from headers. `register_provider()` covers your own services, which is the
+  case the mechanism is really for.
+- `LimitDimension`, and `RateLimitStatus.dimensions` exposing every metered
+  budget. `smartratelimit status`, `list` and `probe` show them.
+- `RateLimitDetector.detect_all()`, returning every dimension a response reports.
+- **Per-path endpoint scopes.** `set_limit("api.example.com/search", limit=10,
+  window="1m")` now scopes a limit to a path prefix, with its own token bucket.
+  Resolution walks from the full path up to the bare host and uses the narrowest
+  scope with a stored limit, so a host-wide default and a tight override
+  coexist: exhausting `/search` no longer throttles `/users`. Previously every
+  path on a host shared one bucket, forcing a choice between pacing everything
+  at the strictest limit and blowing through it.
+- `fail_closed=` on `RateLimiter`, `AsyncRateLimiter` and `RedisStorage`, plus
+  `--fail-closed` on the CLI. An unreachable Redis still fails *open* by default
+  (a limiter outage should not take your job down), but it now says so at
+  WARNING level instead of swallowing the exception, and `fail_closed=True`
+  raises `StorageUnavailable` rather than sending traffic unpaced — the right
+  choice when the limit guards a paid quota.
+- Redis is pinged at construction. `redis-py` connects lazily, so a dead Redis
+  used to look healthy until the first request and then quietly stop limiting.
+- `storage=` accepts a ready-made `StorageBackend` instance, for options the
+  connection string cannot express (a custom Redis `key_prefix`, your own
+  backend). The docs previously told you to assign to the private `_storage`.
+- `StorageBackend.list_endpoints()` and `LimiterBase.list_endpoints()`. The CLI's
+  `list` command now works instead of printing a note saying it cannot.
+- `StorageBackend.get_rate_limit_for(candidates)` resolves a scope in one round
+  trip; SQLite uses a single query and Redis a single pipeline.
+- `RateLimitDetector.detect(url, status_code, headers)`, taking the three pieces
+  rather than a response object, so `requests`, httpx and aiohttp reach
+  identical logic.
+- A `Tests` CI workflow: pytest across Python 3.8-3.13 with a real Redis service
+  container, a build/`twine check`/version-consistency job, and a strict docs
+  build on pull requests. Nothing ran the test suite in CI before, which is how
+  a total limiting failure shipped and sat on PyPI. The workflow **fails if the
+  Redis tests skip**, so a broken service container cannot masquerade as a green
+  build.
+
+### Changed
+- `field(default_factory=datetime.utcnow)` in `models.py` survived the
+  deprecation sweep, which matched only call sites with parentheses. The guard
+  test now matches the bare reference too.
+- Detected headers no longer overwrite a limit you set explicitly. A
+  `confidence="configured"` entry stands, because you set it precisely when the
+  headers were absent or wrong.
+- `set_limit(window=...)` raises `ValueError` on anything that is not a positive
+  whole number plus `d`/`h`/`m`/`s`. A mistyped `"1.5h"` silently becoming one
+  hour paced you against a limit you never asked for, with nothing to tell you.
+- `get_status()` with a bare domain now matches whichever scheme was stored.
+  It assumed `https://` and returned `None` for an http endpoint the limiter was
+  actively pacing.
+- `smartratelimit status` with no endpoint lists every tracked endpoint instead
+  of erroring, and prints `Confidence`.
+- Sync and async limiters now share `LimiterBase`, so storage selection, scope
+  matching, detection bookkeeping and configuration exist once. The async client
+  was a near-copy, which is exactly how a header-casing fix landed on one path
+  and left async requests unpaced for three releases.
+- `datetime.utcnow()` and `datetime.utcfromtimestamp()` are gone (23 call sites),
+  replaced by `smartratelimit._time` helpers with identical naive-UTC semantics.
+  Both are deprecated from Python 3.12 and scheduled for removal.
+
+- `clear(endpoint)` now removes the scopes nested under an endpoint and their
+  buckets, rather than deleting a host's buckets while leaving its path limits
+  behind. Matching is boundary-aware, so clearing `api.example.com` does not
+  reach `api.example.com.evil.com`.
+- `get_status().remaining` reads the live token bucket instead of a stored
+  snapshot, which never moved for a configured limit and aged for a detected
+  one.
+
+### Removed
+- `AsyncRateLimiter._wait_for_token()` and `_get_or_create_bucket()`-based
+  consumption. They operated on a bucket snapshot, so the consumption never
+  reached other workers. `_acquire()` is the supported path.
+
 ## 0.3.2
 
 ### Fixed

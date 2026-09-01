@@ -145,11 +145,40 @@ class TestRateLimiter:
 
         # Make first request
         limiter.request("GET", "https://api.example.com/test")
-        # Make second request (should wait)
-        limiter.request("GET", "https://api.example.com/test")
 
-        # Verify sleep was called
+        # The second request has no token, so it waits for the window. Sleeping
+        # is mocked out here, so no time actually passes and the token never
+        # arrives -- the limiter gives up instead of spinning forever.
+        with pytest.raises(RateLimitExceeded):
+            limiter.request("GET", "https://api.example.com/test")
+
+        # It waited for the real window, not an arbitrary delay.
         assert mock_sleep.called
+        assert mock_sleep.call_args[0][0] == pytest.approx(60, abs=1)
+
+    @patch("smartratelimit.core.requests.Session.request")
+    def test_request_proceeds_after_waiting(self, mock_request):
+        """A request that waits out the window is then allowed through."""
+        limiter = RateLimiter()
+        # Two per second: the second request waits ~0.5s, then proceeds.
+        limiter.set_limit("api.example.com", limit=2, window="1s")
+
+        def make_response():
+            response = Mock()
+            response.url = "https://api.example.com/test"
+            response.status_code = 200
+            response.headers = {}
+            return response
+
+        mock_request.side_effect = [make_response() for _ in range(3)]
+
+        for _ in range(3):
+            assert (
+                limiter.request("GET", "https://api.example.com/test").status_code
+                == 200
+            )
+
+        assert mock_request.call_count == 3
 
     @patch("smartratelimit.core.requests.Session.request")
     def test_request_raises_on_limit(self, mock_request):
