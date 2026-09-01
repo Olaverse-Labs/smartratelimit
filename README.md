@@ -606,28 +606,6 @@ for item in items:
     results.append(response.json())
 ```
 
-## Roadmap
-
-### v0.1.0 - MVP
-- ✅ Basic rate limiting with token bucket algorithm
-- ✅ Automatic header detection
-- ✅ In-memory storage
-- ✅ `requests` library integration
-- ✅ Status monitoring
-
-### v0.2.0 - Production Ready
-- ✅ SQLite persistence
-- ✅ Redis backend for distributed applications
-- ✅ Multi-process support
-- ✅ Performance benchmarks
-- ✅ Comprehensive test coverage
-
-### v0.3.0 (Current) - Advanced Features
-- ✅ `httpx` and `aiohttp` async support
-- ✅ Advanced retry logic with configurable strategies
-- ✅ CLI tools (status, clear, probe commands)
-- ✅ Monitoring/metrics export (Prometheus format)
-
 ## Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](https://github.com/Olaverse-Labs/smartratelimit/blob/main/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
