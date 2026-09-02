@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`smartratelimit simulate`** — model a workload against a set of rate limits
+  without sending anything. Runs the library's own token buckets on a virtual
+  clock, so an hour of traffic is modelled in milliseconds and the answer comes
+  from the same code that paces real requests, rather than a separate model free
+  to disagree with it.
+
+  It reports the sustained ceiling each budget permits, which one actually held
+  requests back, and how long the workload takes. The motivating case: 500 RPM
+  alongside 100k TPM at 2k tokens a request looks comfortable and is in fact a
+  50-requests-a-minute ceiling, ten times tighter than the request limit beside
+  it — nineteen minutes for a thousand requests, with RPM never passing 11%.
+
+  `--latency` turns worker count into a comparable ceiling, so you can tell
+  whether the limit or your own concurrency is the constraint. `--keys` models
+  spreading across API keys. `--limit NAME=COUNT/WINDOW` covers budgets beyond
+  requests and tokens, and `--json` emits the same data for a machine.
+
+  It deliberately does **not** predict 429s. It knows exactly when your limiter
+  will hold a request back; the provider's behaviour additionally depends on
+  burstiness, undocumented burst allowances, other clients on the same key, and
+  token estimates being estimates. The command says so in its own output.
+- `smartratelimit.simulate` (`Budget`, `simulate`, `SimulationResult`) for the
+  same thing from Python.
+
 ## [0.4.0] - 2026-08-26
 
 ### Fixed

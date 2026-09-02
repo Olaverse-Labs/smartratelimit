@@ -23,6 +23,7 @@ A Python library that automatically manages API rate limits, preventing 429 erro
 - 🔄 **Advanced Retry**: Honours `Retry-After` (seconds or HTTP-date), then exponential backoff with jitter
 - 📊 **Metrics**: Built-in metrics collection and Prometheus export
 - 🛠️ **CLI Tools**: Command-line interface for monitoring and management
+- 🧪 **Workload Simulator**: `smartratelimit simulate` tells you which budget will actually bind, before you write any code
 
 ## Installation
 
@@ -311,6 +312,33 @@ never silent.
 
 Note that `redis-py` connects lazily, so the limiter pings Redis at construction
 rather than discovering the problem on your first real request.
+
+### Find the Bottleneck Before You Write Code
+
+`smartratelimit simulate` runs a workload through the library's own token
+buckets on a virtual clock and reports what would happen. It sends nothing.
+
+```bash
+smartratelimit simulate --rpm 500 --tpm 100000 \
+    --requests 1000 --workers 20 --avg-tokens 2000
+```
+
+```
+  BUDGET               CEILING        UTILISATION   HELD BACK
+  requests                   500/min           11%           0
+  tokens                      50/min          105%         950 <-- binding
+
+  ! tokens is the binding budget.
+    950 of 1,000 requests (95%) waited, 1.2s on average.
+```
+
+That configuration looks comfortable — 500 requests a minute allowed, 1,000 to
+send — and takes **nineteen minutes**. 100,000 tokens a minute at 2,000 tokens a
+request is 50 requests a minute, a ceiling ten times tighter than the request
+limit beside it. Adding workers changes nothing; concurrency cannot buy tokens.
+
+Pass `--latency` to find out whether your worker count, rather than the limit, is
+what's holding you up. Full guide: [Simulator](https://olaverse-labs.github.io/smartratelimit/simulator/).
 
 ### Custom Header Mapping
 
