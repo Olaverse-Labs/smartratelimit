@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://olaverse-labs.github.io/smartratelimit/concepts/">
+        <link rel="canonical" href="https://olaverse-labs.github.io/smartratelimit/simulator/">
       
       
-        <link rel="prev" href="../quickstart/">
+        <link rel="prev" href="../cli/">
       
       
-        <link rel="next" href="../choosing/">
+        <link rel="next" href="../examples/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>How it works - smartratelimit</title>
+        <title>Simulator - smartratelimit</title>
       
     
     
@@ -100,7 +100,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#how-it-works" class="md-skip">
+        <a href="#simulator" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              How it works
+              Simulator
             
           </span>
         </div>
@@ -287,12 +287,10 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../quickstart/" class="md-tabs__link">
           
   
@@ -311,10 +309,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="../detection/" class="md-tabs__link">
           
   
@@ -488,10 +488,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -505,22 +503,19 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -538,7 +533,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -581,37 +576,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    How it works
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
         
   
   
@@ -627,125 +595,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#1-the-endpoint-key" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. The endpoint key
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-the-token-bucket" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. The token bucket
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-detection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Detection
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-storage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Storage
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-scopes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Scopes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-dimensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Dimensions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-provider-profiles" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. Provider profiles
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-happens-on-a-429" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What happens on a 429
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#threads-and-processes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Threads and processes
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -790,8 +639,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -815,19 +666,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -845,7 +699,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1056,10 +910,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../simulator/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulator
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1075,6 +956,114 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-bother" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why bother
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#is-it-the-limit-or-is-it-me" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Is it the limit, or is it me?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#more-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        More keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#budgets-other-than-requests-and-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Budgets other than requests and tokens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-will-not-tell-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it will not tell you
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scripting-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scripting it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1195,10 +1184,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-the-endpoint-key" class="md-nav__link">
+  <a href="#why-bother" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. The endpoint key
+        Why bother
       
     </span>
   </a>
@@ -1206,10 +1195,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-the-token-bucket" class="md-nav__link">
+  <a href="#is-it-the-limit-or-is-it-me" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. The token bucket
+        Is it the limit, or is it me?
       
     </span>
   </a>
@@ -1217,10 +1206,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-detection" class="md-nav__link">
+  <a href="#more-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Detection
+        More keys
       
     </span>
   </a>
@@ -1228,10 +1217,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-storage" class="md-nav__link">
+  <a href="#budgets-other-than-requests-and-tokens" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Storage
+        Budgets other than requests and tokens
       
     </span>
   </a>
@@ -1239,10 +1228,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-scopes" class="md-nav__link">
+  <a href="#what-it-will-not-tell-you" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Scopes
+        What it will not tell you
       
     </span>
   </a>
@@ -1250,10 +1239,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-dimensions" class="md-nav__link">
+  <a href="#reading-the-output" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Dimensions
+        Reading the output
       
     </span>
   </a>
@@ -1261,10 +1250,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#7-provider-profiles" class="md-nav__link">
+  <a href="#scripting-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. Provider profiles
+        Scripting it
       
     </span>
   </a>
@@ -1272,21 +1261,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-happens-on-a-429" class="md-nav__link">
+  <a href="#from-python" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What happens on a 429
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#threads-and-processes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Threads and processes
+        From Python
       
     </span>
   </a>
@@ -1313,160 +1291,134 @@
   
 
 
-<h1 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h1>
-<p>One <code>limiter.request()</code> call does four things. Understanding them explains every behaviour on the rest of the site.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                 ┌──────────────────────────────────────────┐
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  request(...)   │ 1. look up stored quota for this endpoint │
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>       │         └──────────────────────────────────────────┘
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>       ▼                          │
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>┌──────────────┐                  ▼
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│ 2. token     │◄──── refill at limit/window tokens per second
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│    bucket    │      empty?  →  sleep until one is available
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>└──────────────┘
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>       │
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>       ▼
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>┌──────────────────┐     ┌─────────────────────────────────────┐
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│ 3. send request  │────►│ 4. read rate-limit headers from the │
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>└──────────────────┘     │    response, update stored quota    │
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                         └─────────────────────────────────────┘
+<h1 id="simulator">Simulator<a class="headerlink" href="#simulator" title="Permanent link">&para;</a></h1>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--rpm<span class="w"> </span><span class="m">500</span><span class="w"> </span>--tpm<span class="w"> </span><span class="m">100000</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--requests<span class="w"> </span><span class="m">1000</span><span class="w"> </span>--workers<span class="w"> </span><span class="m">20</span><span class="w"> </span>--avg-tokens<span class="w"> </span><span class="m">2000</span>
 </span></code></pre></div>
-<h2 id="1-the-endpoint-key">1. The endpoint key<a class="headerlink" href="#1-the-endpoint-key" title="Permanent link">&para;</a></h2>
-<p>State is tracked per <strong>scheme + host</strong>, not per path:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="s2">"https://api.github.com/users/octocat"</span>  <span class="o">-&gt;</span>  <span class="s2">"https://api.github.com"</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="s2">"https://api.github.com/repos/a/b"</span>      <span class="o">-&gt;</span>  <span class="s2">"https://api.github.com"</span>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>EXPECTED TRAFFIC
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>────────────────────────────────────────────────────
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  Requests             1,000 over 20 workers
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  Wall time            19.0 min
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  Throughput           0.88 req/s   (53/min)
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  BUDGET               CEILING        UTILISATION   HELD BACK
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  requests                   500/min           11%           0
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  tokens                      50/min          105%         950 &lt;-- binding
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  ! tokens is the binding budget.
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    950 of 1,000 requests (95%) waited, 1.2s on average.
 </span></code></pre></div>
-<p>Both URLs above share one quota, which matches how most APIs actually count. It also means two APIs on the same host share a bucket, and an API with per-route limits is tracked at its tightest observed value rather than per route.</p>
-<p>Bare domains are accepted anywhere an endpoint is expected (<code>get_status</code>, <code>set_limit</code>, <code>clear</code>) and are normalised to <code>https://</code>.</p>
-<h2 id="2-the-token-bucket">2. The token bucket<a class="headerlink" href="#2-the-token-bucket" title="Permanent link">&para;</a></h2>
-<p>A <a href="https://en.wikipedia.org/wiki/Token_bucket">token bucket</a> holds up to <code>limit</code> tokens and refills continuously at:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>refill_rate = limit / window_in_seconds   # tokens per second
+<p>No requests are sent. The simulation runs the library's own token buckets on a
+virtual clock, so an hour of traffic is modelled in milliseconds — and the
+answer comes from the same code that paces your real requests.</p>
+<h2 id="why-bother">Why bother<a class="headerlink" href="#why-bother" title="Permanent link">&para;</a></h2>
+<p>Because the arithmetic is not obvious, and the intuitive answer is usually wrong.</p>
+<p>The scenario above looks like a comfortable fit: 500 requests a minute allowed,
+1,000 requests to send, 20 workers to send them. In fact <strong>it takes nineteen
+minutes</strong>, and requests-per-minute never gets above 11%.</p>
+<p>The token budget is the only one that matters. 100,000 tokens a minute at 2,000
+tokens a request is <strong>50 requests a minute</strong> — a ceiling ten times tighter than
+the request limit sitting next to it. Adding workers changes nothing:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--tpm<span class="w"> </span><span class="m">100000</span><span class="w"> </span>--avg-tokens<span class="w"> </span><span class="m">2000</span><span class="w"> </span>--requests<span class="w"> </span><span class="m">500</span><span class="w"> </span>--workers<span class="w"> </span><span class="m">2</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--tpm<span class="w"> </span><span class="m">100000</span><span class="w"> </span>--avg-tokens<span class="w"> </span><span class="m">2000</span><span class="w"> </span>--requests<span class="w"> </span><span class="m">500</span><span class="w"> </span>--workers<span class="w"> </span><span class="m">50</span>
 </span></code></pre></div>
-<p>Each request consumes one token. If the bucket is empty, <code>wait_time()</code> says how long until the next token lands, and the limiter sleeps exactly that long.</p>
-<p>The practical effect is <strong>pacing, not stalling</strong>. Given "5000 requests per hour", a naive client fires 5000 requests in three minutes and then sits dead for 57. The bucket refills at 1.39 tokens/second, so requests are spread across the hour and the quota is never actually exhausted.</p>
-<p>Two levers change this:</p>
+<p>Both finish at the same moment. Concurrency cannot buy tokens.</p>
+<h2 id="is-it-the-limit-or-is-it-me">Is it the limit, or is it me?<a class="headerlink" href="#is-it-the-limit-or-is-it-me" title="Permanent link">&para;</a></h2>
+<p>Pass <code>--latency</code> — your API's typical response time — and worker count becomes a
+real ceiling that the simulator will compare against your budgets:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--rpm<span class="w"> </span><span class="m">500</span><span class="w"> </span>--requests<span class="w"> </span><span class="m">200</span><span class="w"> </span>--workers<span class="w"> </span><span class="m">3</span><span class="w"> </span>--latency<span class="w"> </span><span class="m">2</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>  BUDGET               CEILING        UTILISATION   HELD BACK
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  requests                   500/min           18%           0
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  concurrency                 90/min             —           —  &lt;-- binding
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  No request was ever held back: the limits are not your constraint.
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    3 workers at 2.0s each caps you at 90/min, below every budget.
+</span></code></pre></div>
+<p>Worth knowing before you go asking a provider to raise a limit you are nowhere
+near.</p>
+<h2 id="more-keys">More keys<a class="headerlink" href="#more-keys" title="Permanent link">&para;</a></h2>
+<p>Each key gets its own budgets, and work goes to whichever can serve it soonest:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--rpm<span class="w"> </span><span class="m">500</span><span class="w"> </span>--tpm<span class="w"> </span><span class="m">100000</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>--requests<span class="w"> </span><span class="m">1000</span><span class="w"> </span>--workers<span class="w"> </span><span class="m">20</span><span class="w"> </span>--avg-tokens<span class="w"> </span><span class="m">2000</span><span class="w"> </span>--keys<span class="w"> </span><span class="m">4</span>
+</span></code></pre></div>
+<p>19 minutes becomes 4. Note it beats a straight quarter — four keys also means
+four full buckets to open with.</p>
+<h2 id="budgets-other-than-requests-and-tokens">Budgets other than requests and tokens<a class="headerlink" href="#budgets-other-than-requests-and-tokens" title="Permanent link">&para;</a></h2>
+<p><code>--rpm</code>, <code>--tpm</code> and <code>--rpd</code> are shorthand. Anything else is <code>--limit</code>, with
+<code>--cost</code> for what one request spends of it:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--limit<span class="w"> </span><span class="nv">images</span><span class="o">=</span><span class="m">50</span>/1h<span class="w"> </span>--cost<span class="w"> </span><span class="nv">images</span><span class="o">=</span><span class="m">2</span><span class="w"> </span>--requests<span class="w"> </span><span class="m">20</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>  BUDGET               CEILING        UTILISATION   HELD BACK
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  images                        25/h           80%           0
+</span></code></pre></div>
+<p>Twenty requests at two images each is 80% of the hourly budget, spent instantly.
+Nothing was throttled — but there is only 20% of the hour left.</p>
+<h2 id="what-it-will-not-tell-you">What it will not tell you<a class="headerlink" href="#what-it-will-not-tell-you" title="Permanent link">&para;</a></h2>
+<p><strong>It models your limiter, not the provider's.</strong> It knows exactly when
+smartratelimit will hold a request back, because that is arithmetic over budgets
+you supplied.</p>
+<p>It does <strong>not</strong> predict 429s. Those additionally depend on:</p>
 <ul>
-<li>Every response with rate-limit headers <strong>resets the bucket level</strong> to the server's <code>remaining</code> value. The server is the authority; local accounting is only a prediction between responses.</li>
-<li>The bucket's <code>capacity</code> and <code>refill_rate</code> are recomputed whenever a new limit is detected, so an API that tightens its quota mid-run is followed immediately.</li>
+<li>burstiness at the provider's edge, and their undocumented burst allowances</li>
+<li>other clients sharing the same key</li>
+<li>the gap between the token count you <em>estimate</em> and the one you are <em>billed</em>
+  for — you do not know the real number until the response arrives</li>
+<li>server-side changes to your limits that no header announced</li>
 </ul>
-<h2 id="3-detection">3. Detection<a class="headerlink" href="#3-detection" title="Permanent link">&para;</a></h2>
-<p>After the response arrives, the detector looks for rate-limit headers in this order:</p>
-<ol>
-<li>A <strong>per-API profile</strong>, if the host is one of <code>github.com</code>, <code>api.stripe.com</code>, <code>api.twitter.com</code>, <code>api.openai.com</code></li>
-<li>Your <strong>custom <code>headers_map</code></strong>, if you passed one</li>
-<li><strong>Standard patterns</strong> — <code>X-RateLimit-*</code>, <code>RateLimit-*</code>, <code>X-Rate-Limit-*</code>, <code>X-RateLimit-Requests-*</code></li>
-<li>On a 429 only: <strong><code>Retry-After</code></strong>, which yields a window but no limit</li>
-</ol>
-<p>Reset values are parsed as a Unix timestamp, an ISO 8601 datetime, or a relative number of seconds — values under 86400 are read as "seconds from now", larger ones as absolute timestamps. Details and the full header list: <a href="../detection/">Detection &amp; Headers</a>.</p>
-<p>If nothing is detected, nothing is stored, and requests to that endpoint stay unpaced unless you supplied <code>default_limits</code> or called <code>set_limit()</code>.</p>
-<h2 id="4-storage">4. Storage<a class="headerlink" href="#4-storage" title="Permanent link">&para;</a></h2>
-<p>The stored quota and bucket live behind a small interface with three implementations — memory, SQLite, Redis — selected by the <code>storage=</code> string. Same behaviour, different blast radius:</p>
-<table>
-<thead>
-<tr>
-<th></th>
-<th>Survives restart</th>
-<th>Shared across processes</th>
-<th>Shared across machines</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>memory</code></td>
-<td>no</td>
-<td>no</td>
-<td>no</td>
-</tr>
-<tr>
-<td><code>sqlite:///file.db</code></td>
-<td>yes</td>
-<td>yes, same machine</td>
-<td>no</td>
-</tr>
-<tr>
-<td><code>redis://host:port/0</code></td>
-<td>yes</td>
-<td>yes</td>
-<td>yes</td>
-</tr>
-</tbody>
-</table>
-<p>Tokens are consumed <strong>inside</strong> the store as one atomic step — under the lock for
-memory, in a <code>BEGIN IMMEDIATE</code> transaction for SQLite, in a Lua script for Redis
-— so no two workers can spend the same token.</p>
-<h2 id="5-scopes">5. Scopes<a class="headerlink" href="#5-scopes" title="Permanent link">&para;</a></h2>
-<p>A limit belongs to an <strong>endpoint scope</strong>: a host, optionally narrowed by a path
-prefix. <code>https://api.example.com</code> covers the whole host;
-<code>https://api.example.com/search</code> covers only paths under <code>/search</code>.</p>
-<p>Resolving a request walks from the most specific scope to the least —
-<code>/v1/users/42</code>, then <code>/v1/users</code>, then <code>/v1</code>, then the bare host — and uses the
-first one with a stored limit. That is what lets a host-wide default and a
-narrow override coexist without either knowing about the other, and it gives
-each scope its own token bucket, so exhausting <code>/search</code> leaves <code>/users</code> alone.</p>
-<p>Query strings and trailing slashes are dropped when matching: they identify a
-request, not a quota. Detected limits attach to whichever scope is governing the
-URL, but never overwrite one you set yourself — a <code>confidence="configured"</code>
-entry stands, because you set it precisely when the headers could not be
-trusted.</p>
-<p>See <a href="../choosing/">Which storage backend?</a> and <a href="../storage/">Storage Backends</a>.</p>
-<div class="admonition note">
-<p class="admonition-title">Failing open is the default, not the only option</p>
-<p>An unreachable Redis fails <em>open</em>: the request goes out unpaced and a
-warning is logged, so a limiter outage does not take your job down with it.
-When the limit guards a paid quota that trade is wrong — pass
-<code>fail_closed=True</code> and the limiter raises <code>StorageUnavailable</code> (a subclass
-of <code>RateLimitExceeded</code>) instead of waving traffic through.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">storage</span><span class="o">=</span><span class="s2">"redis://localhost:6379/0"</span><span class="p">,</span> <span class="n">fail_closed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<p>A number like "expect 14.2% 429s" would be a guess wearing a decimal point. This
+command deliberately does not produce one.</p>
+<h2 id="reading-the-output">Reading the output<a class="headerlink" href="#reading-the-output" title="Permanent link">&para;</a></h2>
+<p><strong>CEILING</strong> is the sustained rate a budget permits: its refill rate divided by
+what one request costs. This is the number to plan against.</p>
+<p><strong>UTILISATION above 100%</strong> is the opening burst. Buckets start full, so a run
+spends one bucket's worth of head start that will not recur. The report says so
+when it happens.</p>
+<p><strong>HELD BACK</strong> counts requests that particular budget made wait. A budget can
+have the tightest ceiling and still hold nothing back, if something else — worker
+concurrency, or simply not enough work — got there first. Only what actually
+constrained the run is marked <code>&lt;-- binding</code>.</p>
+<h2 id="scripting-it">Scripting it<a class="headerlink" href="#scripting-it" title="Permanent link">&para;</a></h2>
+<p><code>--json</code> emits the same data for a machine:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--rpm<span class="w"> </span><span class="m">500</span><span class="w"> </span>--tpm<span class="w"> </span><span class="m">100000</span><span class="w"> </span>--avg-tokens<span class="w"> </span><span class="m">2000</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--requests<span class="w"> </span><span class="m">1000</span><span class="w"> </span>--workers<span class="w"> </span><span class="m">20</span><span class="w"> </span>--json
 </span></code></pre></div>
-<p>Either way it is logged. Redis is pinged at construction, because
-<code>redis-py</code> connects lazily and an unchecked client looks healthy right up
-until it silently stops limiting.</p>
-</div>
-<h2 id="6-dimensions">6. Dimensions<a class="headerlink" href="#6-dimensions" title="Permanent link">&para;</a></h2>
-<p>A scope can meter more than one thing. <code>requests</code> is universal; an LLM API also
-meters <code>tokens</code>, and the token budget is usually the one that binds — a caller
-well inside its requests-per-minute allowance still gets a 429 once
-tokens-per-minute is spent.</p>
-<p>Each dimension has its own budget and its own bucket. A request declares what it
-spends:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"POST"</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span> <span class="n">cost</span><span class="o">=</span><span class="p">{</span><span class="s2">"tokens"</span><span class="p">:</span> <span class="mi">1500</span><span class="p">})</span>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">"wall_seconds"</span><span class="p">:</span><span class="w"> </span><span class="mf">1140.0</span><span class="p">,</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">"achieved_rps"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.8772</span><span class="p">,</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">"throttled"</span><span class="p">:</span><span class="w"> </span><span class="mi">950</span><span class="p">,</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nt">"throttled_fraction"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">"binding"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tokens"</span><span class="p">,</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="nt">"budgets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"requests"</span><span class="p">,</span><span class="w"> </span><span class="nt">"ceiling_per_minute"</span><span class="p">:</span><span class="w"> </span><span class="mf">500.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"utilisation"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1053</span><span class="p">,</span><span class="w"> </span><span class="nt">"blocked"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">},</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tokens"</span><span class="p">,</span><span class="w"> </span><span class="nt">"ceiling_per_minute"</span><span class="p">:</span><span class="w"> </span><span class="mf">50.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"utilisation"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0526</span><span class="p">,</span><span class="w"> </span><span class="nt">"blocked"</span><span class="p">:</span><span class="w"> </span><span class="mi">950</span><span class="p">}</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span><span class="p">]</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>and is admitted only when <strong>every</strong> dimension it touches can pay. The charge is
-one atomic step across all of them, which is not a detail: charging them in turn
-would let a request spend its request allowance and then be refused for tokens,
-draining the wrong budget on every rejection. A refused request charges nothing.</p>
-<p>A dimension a request does not spend never gates it, so a <code>GET</code> with no token
-cost is not held up by an exhausted token budget.</p>
-<h2 id="7-provider-profiles">7. Provider profiles<a class="headerlink" href="#7-provider-profiles" title="Permanent link">&para;</a></h2>
-<p>Detection needs a response. Some limits matter before you have one — GitHub
-allows 60 requests an hour unauthenticated, and no response tells you whether
-your credentials were accepted until you have already spent a request finding
-out.</p>
-<p>For a small set of hosts the library seeds documented limits at construction,
-marked <code>confidence="registry"</code> and replaced as soon as real headers arrive. The
-table is deliberately tiny: most providers meter per account tier, so a baked-in
-number would be a guess about <em>your</em> account, and those providers send their
-limits in headers anyway. See <a href="../providers/">Provider profiles</a>.</p>
-<h2 id="what-happens-on-a-429">What happens on a 429<a class="headerlink" href="#what-happens-on-a-429" title="Permanent link">&para;</a></h2>
-<p>Even with pacing you can still be handed a 429 — another client on the same key, a limit the API never advertised, a burst that started before the first response taught the limiter anything.</p>
-<p>When <code>request()</code> sees a 429 (or a 503 or 504), it retries according to its <code>RetryConfig</code> — three attempts by default. A <code>Retry-After</code> header decides the wait, since the server knows when its window reopens; both the seconds form and the HTTP-date form are honoured, capped at <code>max_delay</code>. Without that header the limiter falls back to exponential backoff with jitter. If the last attempt still fails, the response is returned as-is for you to handle.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.retry</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetryConfig</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">retry</span><span class="o">=</span><span class="n">RetryConfig</span><span class="p">(</span><span class="n">max_retries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">max_delay</span><span class="o">=</span><span class="mf">30.0</span><span class="p">))</span>
+<p><code>achieved_rps</code> is <code>null</code> when the workload fits inside the opening burst: no time
+passes, so there is no rate to report.</p>
+<h2 id="from-python">From Python<a class="headerlink" href="#from-python" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">timedelta</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.simulate</span><span class="w"> </span><span class="kn">import</span> <span class="n">Budget</span><span class="p">,</span> <span class="n">simulate</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">simulate</span><span class="p">(</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">budgets</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>        <span class="n">Budget</span><span class="p">(</span><span class="s2">"requests"</span><span class="p">,</span> <span class="mi">500</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">cost</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>        <span class="n">Budget</span><span class="p">(</span><span class="s2">"tokens"</span><span class="p">,</span> <span class="mi">100_000</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">cost</span><span class="o">=</span><span class="mi">2_000</span><span class="p">),</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="p">],</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="n">requests</span><span class="o">=</span><span class="mi">1_000</span><span class="p">,</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="n">workers</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">)</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">binding</span><span class="p">)</span>                       <span class="c1"># 'tokens'</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">budget</span><span class="p">(</span><span class="s2">"tokens"</span><span class="p">)</span><span class="o">.</span><span class="n">ceiling_rps</span><span class="p">)</span>  <span class="c1"># 0.833 -&gt; 50/min</span>
 </span></code></pre></div>
-<p>Set <code>raise_on_limit=True</code> and the limiter never sleeps: it raises <code>RateLimitExceeded</code> when the bucket is empty, and raises rather than waiting out a retryable rejection. That's the right mode for a request handler where a slow response is worse than an error.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimiter</span><span class="p">,</span> <span class="n">RateLimitExceeded</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">(</span><span class="n">raise_on_limit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">response</span> <span class="o">=</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"https://api.example.com/data"</span><span class="p">)</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">except</span> <span class="n">RateLimitExceeded</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Would have waited: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<p>Once the simulation tells you what binds, configure it for real — see
+<a href="../concepts/#6-dimensions">multi-dimensional limits</a>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">limiter</span><span class="o">.</span><span class="n">set_limit</span><span class="p">(</span><span class="s2">"api.openai.com"</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="s2">"1m"</span><span class="p">)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">limiter</span><span class="o">.</span><span class="n">set_limit</span><span class="p">(</span><span class="s2">"api.openai.com"</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">100_000</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="s2">"1m"</span><span class="p">,</span> <span class="n">dimension</span><span class="o">=</span><span class="s2">"tokens"</span><span class="p">)</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"POST"</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span> <span class="n">cost</span><span class="o">=</span><span class="p">{</span><span class="s2">"tokens"</span><span class="p">:</span> <span class="mi">2_000</span><span class="p">})</span>
 </span></code></pre></div>
-<h2 id="threads-and-processes">Threads and processes<a class="headerlink" href="#threads-and-processes" title="Permanent link">&para;</a></h2>
-<p><code>RateLimiter</code> is safe to share across threads — all three backends guard their state with a lock. Each <code>RateLimiter</code> also owns one <code>requests.Session</code>, which is thread-safe for ordinary use.</p>
-<p>What a lock cannot do is coordinate <em>separate processes</em>. Two Gunicorn workers with <code>storage="memory"</code> each believe they own the whole quota, and together they spend it twice as fast. That is what the Redis backend exists for.</p>
-<p>The sleeping is <strong>blocking</strong> — <code>time.sleep</code> on the calling thread. In a thread pool that's usually what you want. In an event loop it is not: use <a href="../async/"><code>AsyncRateLimiter</code></a>, which awaits instead.</p>
 
 
 

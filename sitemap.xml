@@ -2,58 +2,62 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/api/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/async/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/changelog/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/choosing/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/cli/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/concepts/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/detection/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/examples/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/metrics/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/providers/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/quickstart/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/retry/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
+    </url>
+    <url>
+         <loc>https://olaverse-labs.github.io/smartratelimit/simulator/</loc>
+         <lastmod>2026-09-03</lastmod>
     </url>
     <url>
          <loc>https://olaverse-labs.github.io/smartratelimit/storage/</loc>
-         <lastmod>2026-09-01</lastmod>
+         <lastmod>2026-09-03</lastmod>
     </url>
 </urlset>
