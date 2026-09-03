@@ -12,7 +12,7 @@ from smartratelimit.models import LimitDimension, RateLimitStatus
 from smartratelimit.providers import Provider, SeedLimit, register_provider
 from smartratelimit.retry import RetryConfig, RetryHandler, RetryStrategy
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __all__ = [
     "RateLimiter",
     "AsyncRateLimiter",

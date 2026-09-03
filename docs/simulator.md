@@ -10,11 +10,11 @@ EXPECTED TRAFFIC
 ────────────────────────────────────────────────────
   Requests             1,000 over 20 workers
   Wall time            19.0 min
-  Throughput           0.88 req/s   (53/min)
+  Throughput           0.88 req/s   (53 req/min)
 
-  BUDGET               CEILING        UTILISATION   HELD BACK
-  requests                   500/min           11%           0
-  tokens                      50/min          105%         950 <-- binding
+  BUDGET                 RAW LIMIT COST/REQ EFFECTIVE CEILING   UTIL HELD BACK
+  requests        500 requests/min        1       500 req/min    11%         0
+  tokens        100,000 tokens/min    2,000        50 req/min   105%       950  <-- binding
 
   ! tokens is the binding budget.
     950 of 1,000 requests (95%) waited, 1.2s on average.
@@ -57,12 +57,12 @@ smartratelimit simulate --rpm 500 --requests 200 --workers 3 --latency 2
 ```
 
 ```
-  BUDGET               CEILING        UTILISATION   HELD BACK
-  requests                   500/min           18%           0
-  concurrency                 90/min             —           —  <-- binding
+  BUDGET                 RAW LIMIT COST/REQ EFFECTIVE CEILING   UTIL HELD BACK
+  requests        500 requests/min        1       500 req/min    18%         0
+  concurrency                    —        —        90 req/min      —         —  <-- binding
 
   No request was ever held back: the limits are not your constraint.
-    3 workers at 2.0s each caps you at 90/min, below every budget.
+    3 workers at 2.0s each caps you at 90 req/min, below every budget.
 ```
 
 Worth knowing before you go asking a provider to raise a limit you are nowhere
@@ -90,8 +90,8 @@ smartratelimit simulate --limit images=50/1h --cost images=2 --requests 20
 ```
 
 ```
-  BUDGET               CEILING        UTILISATION   HELD BACK
-  images                        25/h           80%           0
+  BUDGET                 RAW LIMIT COST/REQ EFFECTIVE CEILING   UTIL HELD BACK
+  images               50 images/h        2          25 req/h    80%         0
 ```
 
 Twenty requests at two images each is 80% of the hourly budget, spent instantly.
@@ -116,10 +116,16 @@ command deliberately does not produce one.
 
 ## Reading the output
 
-**CEILING** is the sustained rate a budget permits: its refill rate divided by
-what one request costs. This is the number to plan against.
+**RAW LIMIT** is the budget as you configured it, in the units it meters:
+100,000 *tokens* a minute.
 
-**UTILISATION above 100%** is the opening burst. Buckets start full, so a run
+**EFFECTIVE CEILING** is what that becomes once one request's **COST/REQ** comes
+out of it — always requests, whatever the budget itself counts. 100,000 tokens a
+minute at 2,000 tokens a request is 50 *requests* a minute. This is the number to
+plan against, and the reason both columns are here: "50/min" under a token budget
+invites you to read it as fifty tokens.
+
+**UTIL above 100%** is the opening burst. Buckets start full, so a run
 spends one bucket's worth of head start that will not recur. The report says so
 when it happens.
 

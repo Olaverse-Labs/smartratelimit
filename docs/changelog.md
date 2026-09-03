@@ -4,6 +4,38 @@ All notable changes to smartratelimit. The format follows [Keep a Changelog](htt
 
 Current release: **v{{ smartratelimit_version }}**
 
+## 0.5.1
+
+### Fixed
+- **`simulate` under-reported wall-clock time when more than one budget was
+  configured.** The wait before a request is `needed / refill_rate`, so
+  refilling for exactly that long lands on the cost — but in floating point it
+  can land a few ULPs below it, and `TokenBucket.consume`'s `tokens >= cost`
+  check then refused and returned `False`. The simulator ignored that refusal
+  and counted the request anyway, sending it for free.
+
+  Over a long run this let the budget deliver more units than it ever supplied:
+  4,410 RPM alongside 100k TPM at 2k tokens a request reported 18.1 minutes for
+  1,000 requests, which would need 2,000,000 tokens against the 1,910,000 the
+  budget hands out in that time. The correct answer is 19.00 minutes, where
+  supply and spend balance exactly. The real limiter was never affected — it
+  re-acquires after sleeping, so a wait a hair short simply sleeps again — but a
+  simulator that disagrees with the thing it simulates is the one bug it cannot
+  have. Charged directly after the wait now, and a conservation test asserts no
+  run spends units the budget never supplied.
+
+### Changed
+- **The simulator's budget table names what each rate counts.** A token budget's
+  ceiling is in *requests*, and rendering it as `50.0/min` next to a limit of
+  100,000 tokens a minute invited exactly the wrong reading. The table now shows
+  `RAW LIMIT` (the budget as configured, `100,000 tokens/min`), `COST/REQ`, and
+  `EFFECTIVE CEILING` (`50 req/min`) as separate columns, so the arithmetic
+  between them is visible. The CLI and the docs playground render through the
+  same column widths and unit logic.
+- The playground's status line and output pane state their foreground colour.
+  This theme's code background is dark in both schemes, so inheriting the body
+  colour put near-black text on near-black in light mode.
+
 ## 0.5.0
 
 ### Added

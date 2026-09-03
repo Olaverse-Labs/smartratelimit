@@ -68,16 +68,20 @@ Nothing is sent anywhere. Everything runs on your machine.
 
 <style>
 .srl { margin: 1.2rem 0; }
+/* This theme's code background is dark in BOTH schemes, so anything sitting on
+   it needs the code foreground stated outright. Inheriting the body colour put
+   near-black text on near-black in light mode — the status line vanished. */
 .srl-status {
   display: flex; align-items: center; gap: .6rem;
   padding: .8rem 1rem; border-radius: .3rem;
-  background: var(--md-code-bg-color); font-size: .8rem;
+  background: var(--md-code-bg-color); color: var(--md-code-fg-color);
+  font-size: .8rem;
 }
-.srl-status.srl-error { border-left: .2rem solid #d32f2f; }
+.srl-status.srl-error { border-left: .2rem solid var(--ov-pink, #E84B8A); }
 .srl-spinner {
   width: .9rem; height: .9rem; flex: none; border-radius: 50%;
-  border: 2px solid var(--md-default-fg-color--lightest);
-  border-top-color: var(--md-primary-fg-color);
+  border: 2px solid rgba(216, 210, 200, .25);
+  border-top-color: var(--ov-purple, #9C85FF);
   animation: srl-spin .8s linear infinite;
 }
 .srl-status.srl-done .srl-spinner,
@@ -99,9 +103,9 @@ Nothing is sent anywhere. Everything runs on your machine.
 .srl-out {
   font-family: var(--md-code-font-family); font-size: .72rem; line-height: 1.5;
   white-space: pre; overflow-x: auto; padding: 1rem;
-  background: var(--md-code-bg-color); border-radius: .3rem; margin: 0;
+  background: var(--md-code-bg-color); color: var(--md-code-fg-color);
+  border-radius: .3rem; margin: 0;
 }
-.srl-bind { color: #d32f2f; font-weight: 700; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -121,6 +125,31 @@ Nothing is sent anywhere. Everything runs on your machine.
   }
 
   function fmt(n) { return Number(n).toLocaleString(); }
+
+  // Mirrors cli._rate: pick the time unit that keeps the digits, and name what
+  // is being counted. A budget of 50 an hour is 0.83 a minute, which rounds to
+  // "0/min" and reads as broken.
+  function rate(perSecond, unit) {
+    var label = unit ? " " + unit : "";
+    var perMinute = perSecond * 60;
+    if (perMinute >= 1) return fmt(Math.round(perMinute)) + label + "/min";
+    var perHour = perSecond * 3600;
+    if (perHour >= 1) return fmt(Math.round(perHour)) + label + "/h";
+    return fmt(Math.round(perSecond * 86400)) + label + "/day";
+  }
+
+  // Header and rows go through one function with one set of widths — the same
+  // widths cli._sim_row uses. Hand-counting the header is exactly how these
+  // columns drifted apart the first time.
+  var COLUMNS = [11, 20, 8, 17, 6, 9];
+
+  function row(name, raw, cost, ceiling, util, held) {
+    var cells = [name.padEnd(COLUMNS[0])];
+    [raw, cost, ceiling, util, held].forEach(function (value, i) {
+      cells.push(value.padStart(COLUMNS[i + 1]));
+    });
+    return "  " + cells.join(" ");
+  }
 
   function syncLabels() {
     document.getElementById("rpm-out").textContent = fmt(rpm.value) + "/min";
@@ -157,28 +186,32 @@ Nothing is sent anywhere. Everything runs on your machine.
     }
 
     lines.push("");
-    // Header built with the same padding as the rows: a hand-counted string
-    // drifts the moment a column width changes, and it already had.
-    function row(name, ceiling, util, blocked) {
-      return "  " + name.padEnd(20) + ceiling.padStart(14) +
-             util.padStart(13) + blocked.padStart(12);
-    }
-    lines.push(row("BUDGET", "CEILING", "UTILISATION", "HELD BACK"));
+    lines.push(row("BUDGET", "RAW LIMIT", "COST/REQ", "EFFECTIVE CEILING",
+                   "UTIL", "HELD BACK"));
     r.budgets.forEach(function (b) {
-      var perMin = b.ceiling_per_minute;
-      var ceiling = perMin >= 1 ? fmt(Math.round(perMin)) + "/min"
-                                : fmt(Math.round(perMin * 60)) + "/h";
       var mark = b.name === r.binding ? "  <-- binding" : "";
-      lines.push(row(b.name, ceiling,
-                     Math.round(b.utilisation * 100) + "%",
-                     fmt(b.blocked)) + mark);
+      lines.push(row(
+        b.name,
+        // The limit as configured, in its own units — the reader has to be
+        // able to find the number they typed. "50/min" under a token budget
+        // reads as fifty tokens when it means fifty requests, and that is the
+        // one figure on this table people misread.
+        rate(b.limit / b.window_seconds, b.name),
+        fmt(b.cost_per_request),
+        // What it becomes once each request's cost comes out of it: always
+        // requests, whatever the budget itself meters.
+        rate(b.ceiling_per_minute / 60, "req"),
+        Math.round(b.utilisation * 100) + "%",
+        fmt(b.blocked)
+      ) + mark);
     });
     if (r.concurrency_ceiling_rps !== null) {
-      var cc = fmt(Math.round(r.concurrency_ceiling_rps * 60)) + "/min";
       var ccBinds = r.binding === null &&
         r.concurrency_ceiling_rps < Math.min.apply(null,
           r.budgets.map(function (b) { return b.ceiling_per_minute / 60; }));
-      lines.push(row("concurrency", cc, "—", "—") + (ccBinds ? "  <-- binding" : ""));
+      lines.push(row("concurrency", "—", "—",
+                     rate(r.concurrency_ceiling_rps, "req"), "—", "—") +
+                 (ccBinds ? "  <-- binding" : ""));
     }
 
     lines.push("");
@@ -195,7 +228,7 @@ Nothing is sent anywhere. Everything runs on your machine.
     if (r.burst_affected) {
       lines.push("");
       lines.push("  Buckets start full, so this run spent a head start that will not");
-      lines.push("  recur. CEILING is the rate you can actually sustain.");
+      lines.push("  recur. EFFECTIVE CEILING is the rate you can actually sustain.");
     }
 
     out.textContent = lines.join("\n");
