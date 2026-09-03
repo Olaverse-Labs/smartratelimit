@@ -324,9 +324,9 @@ smartratelimit simulate --rpm 500 --tpm 100000 \
 ```
 
 ```
-  BUDGET               CEILING        UTILISATION   HELD BACK
-  requests                   500/min           11%           0
-  tokens                      50/min          105%         950 <-- binding
+  BUDGET                 RAW LIMIT COST/REQ EFFECTIVE CEILING   UTIL HELD BACK
+  requests        500 requests/min        1       500 req/min    11%         0
+  tokens        100,000 tokens/min    2,000        50 req/min   105%       950  <-- binding
 
   ! tokens is the binding budget.
     950 of 1,000 requests (95%) waited, 1.2s on average.

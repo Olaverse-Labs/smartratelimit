@@ -56,20 +56,25 @@ def cmd_status(args):
             print("  No rate limit information available")
 
 
-def _rate(per_second):
+def _rate(per_second, unit=""):
     """
-    Render a rate at a unit that keeps its significant digits.
+    Render a rate at a time unit that keeps its significant digits.
 
     A budget of 50 an hour is 0.83 a minute, which rounds to "0/min" and reads
-    as broken. Pick the unit that shows the number instead.
+    as broken. Pick the time unit that shows the number instead.
+
+    ``unit`` names what is being counted. "50/min" against a token budget reads
+    as fifty tokens a minute when it means fifty *requests* a minute, and that
+    is the one number on the report someone is most likely to misread.
     """
+    label = f" {unit}" if unit else ""
     per_minute = per_second * 60
     if per_minute >= 1:
-        return f"{per_minute:,.0f}/min"
+        return f"{per_minute:,.0f}{label}/min"
     per_hour = per_second * 3600
     if per_hour >= 1:
-        return f"{per_hour:,.0f}/h"
-    return f"{per_second * 86400:,.0f}/day"
+        return f"{per_hour:,.0f}{label}/h"
+    return f"{per_second * 86400:,.0f}{label}/day"
 
 
 def _duration(seconds):
@@ -316,6 +321,22 @@ def _result_as_dict(result):
     }
 
 
+#: Column widths for the budget table. Header and rows are rendered through
+#: the same function so a width change cannot misalign them — hand-counting the
+#: header is exactly how the columns drifted apart the first time.
+_SIM_COLUMNS = (11, 20, 8, 17, 6, 9)
+
+
+def _sim_row(name, raw, cost, ceiling, util, held):
+    """Render one line of the budget table."""
+    cells = [name.ljust(_SIM_COLUMNS[0])]
+    cells += [
+        value.rjust(width)
+        for value, width in zip((raw, cost, ceiling, util, held), _SIM_COLUMNS[1:])
+    ]
+    return "  " + " ".join(cells)
+
+
 def _print_simulation(result):
     """Human-readable simulation report."""
     minutes = result.wall_seconds / 60.0
@@ -330,7 +351,7 @@ def _print_simulation(result):
     else:
         print(f"  Wall time            {_duration(result.wall_seconds)}")
         print(f"  Throughput           {result.achieved_rps:.2f} req/s"
-              f"   ({_rate(result.achieved_rps)})")
+              f"   ({_rate(result.achieved_rps, 'req')})")
 
     tightest_budget = min(b.ceiling_rps for b in result.budgets)
     concurrency_binds = (
@@ -339,21 +360,41 @@ def _print_simulation(result):
         and result.concurrency_ceiling_rps < tightest_budget
     )
 
-    print("\n  BUDGET               CEILING        UTILISATION   HELD BACK")
+    print()
+    print(_sim_row("BUDGET", "RAW LIMIT", "COST/REQ", "EFFECTIVE CEILING",
+                   "UTIL", "HELD BACK"))
     for b in result.budgets:
         # Mark what actually constrained this run, not merely what is tightest
         # on paper — a budget can have the lowest ceiling and never bind.
-        marker = " <-- binding" if b.name == result.binding else ""
+        marker = "  <-- binding" if b.name == result.binding else ""
         print(
-            f"  {b.name:<20} {_rate(b.ceiling_rps):>13} "
-            f"{b.utilisation:>13.0%}   {b.blocked:>9,}{marker}"
+            _sim_row(
+                b.name,
+                # The limit as configured, in its own units: the reader needs to
+                # find the number they typed somewhere on this report.
+                _rate(b.limit / b.window.total_seconds(), b.name),
+                f"{b.cost:,g}",
+                # And what that becomes once each request's cost is paid out of
+                # it — always requests, whatever the budget meters.
+                _rate(b.ceiling_rps, "req"),
+                f"{b.utilisation:.0%}",
+                f"{b.blocked:,}",
+            )
+            + marker
         )
 
     if result.concurrency_ceiling_rps is not None:
         marker = "  <-- binding" if concurrency_binds else ""
         print(
-            f"  {'concurrency':<20} {_rate(result.concurrency_ceiling_rps):>13} "
-            f"{'—':>13}   {'—':>9}{marker}"
+            _sim_row(
+                "concurrency",
+                "—",
+                "—",
+                _rate(result.concurrency_ceiling_rps, "req"),
+                "—",
+                "—",
+            )
+            + marker
         )
 
     print()
@@ -365,7 +406,7 @@ def _print_simulation(result):
         if concurrency_binds:
             print(
                 f"    {result.workers} workers at {args_latency(result)} each caps you at "
-                f"{_rate(result.concurrency_ceiling_rps)}, below every budget."
+                f"{_rate(result.concurrency_ceiling_rps, 'req')}, below every budget."
             )
     else:
         held = result.throttled_fraction
@@ -378,7 +419,7 @@ def _print_simulation(result):
     if result.burst_affected:
         print()
         print("  Note: buckets start full, so this run spent one bucket's worth of")
-        print("  head start that will not recur. The CEILING column is the rate you")
+        print("  head start that will not recur. EFFECTIVE CEILING is the rate you")
         print("  can actually sustain.")
 
     # The line that keeps this honest.

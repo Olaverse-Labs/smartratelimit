@@ -161,6 +161,42 @@ class TestValidation:
             simulate([rpm(0)], requests=10)
 
 
+class TestConservation:
+    """A run may never spend units the budget never supplied."""
+
+    @staticmethod
+    def supplied(budget, wall):
+        """Units the budget hands out over ``wall`` seconds, burst included."""
+        return budget.limit + budget.refill_rate * wall
+
+    def test_multi_budget_run_spends_only_what_was_supplied(self):
+        # Two budgets means the binding one is waited on and the other is
+        # charged after that wait -- the path where a few ULPs of rounding once
+        # let requests through for free, understating the wall clock. 1000
+        # requests at 2k tokens is 2M tokens; 100k of that is the opening
+        # bucket, and the remaining 1.9M takes 1140s to refill at 100k/min.
+        tokens = tpm(100_000, 2000)
+        result = simulate(
+            [rpm(4410), tokens], requests=1000, workers=20, latency=1.0
+        )
+        assert result.wall_seconds == pytest.approx(1140.0)
+        assert 1000 * tokens.cost <= self.supplied(tokens, result.wall_seconds) + 1e-6
+
+    def test_single_budget_run_spends_only_what_was_supplied(self):
+        budget = tpm(100_000, 2000)
+        result = simulate([budget], requests=400)
+        assert 400 * budget.cost <= self.supplied(budget, result.wall_seconds) + 1e-6
+
+    def test_every_budget_is_charged_for_every_request(self):
+        # The loose budget is never the reason to wait, so nothing else checks
+        # that it gets charged at all.
+        loose, tight = rpm(4410), tpm(100_000, 2000)
+        result = simulate([loose, tight], requests=200, workers=20, latency=1.0)
+        assert result.budget("requests").achieved_per_window == pytest.approx(
+            200 * loose.cost / (result.wall_seconds / 60)
+        )
+
+
 class TestDeterminism:
     """A simulator that wobbles is not worth running."""
 
@@ -229,6 +265,32 @@ class TestCLI:
         # 50/hour must not render as "0/min".
         assert "0/min" not in result.stdout
         assert "/h" in result.stdout
+
+    def test_table_names_what_each_rate_counts(self):
+        """A token budget's ceiling is in requests; the table has to say so."""
+        result = run_cli(
+            "--rpm", "4410", "--tpm", "100000", "--avg-tokens", "2000",
+            "--requests", "1000", "--workers", "20", "--latency", "1",
+        )
+
+        # The configured limit, in the units it was configured in ...
+        assert "100,000 tokens/min" in result.stdout
+        # ... and what it becomes once 2,000 tokens a request come out of it.
+        assert "50 req/min" in result.stdout
+        # The cost that turns one into the other is on the row too.
+        assert "COST/REQ" in result.stdout
+        assert "2,000" in result.stdout
+
+    def test_table_columns_line_up(self):
+        result = run_cli("--rpm", "4410", "--tpm", "100000", "--avg-tokens", "2000",
+                         "--requests", "1000", "--workers", "20", "--latency", "1")
+
+        lines = result.stdout.splitlines()
+        head = next(i for i, ln in enumerate(lines) if ln.startswith("  BUDGET"))
+        table = [ln.split("  <--")[0].rstrip() for ln in lines[head:head + 4]]
+        # Cells are padded to fixed widths, so every row ends in the same place
+        # unless a value has outgrown its column.
+        assert len({len(ln) for ln in table}) == 1, table
 
     def test_requires_a_limit(self):
         result = run_cli("--requests", "10")
