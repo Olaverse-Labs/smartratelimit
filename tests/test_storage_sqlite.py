@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import utcnow
 from smartratelimit.models import RateLimit, TokenBucket
 from smartratelimit.storage import SQLiteStorage
 
@@ -34,7 +37,7 @@ class TestSQLiteStorage:
         """Test storing and retrieving rate limits."""
         storage = SQLiteStorage(":memory:")
 
-        reset_time = datetime.utcnow() + timedelta(hours=1)
+        reset_time = utcnow() + timedelta(hours=1)
         rate_limit = RateLimit(
             endpoint="https://api.example.com",
             limit=100,
@@ -79,7 +82,7 @@ class TestSQLiteStorage:
         try:
             # Create storage and add data
             storage1 = SQLiteStorage(db_path)
-            reset_time = datetime.utcnow() + timedelta(hours=1)
+            reset_time = utcnow() + timedelta(hours=1)
             rate_limit = RateLimit(
                 endpoint="https://api.example.com",
                 limit=100,
@@ -104,7 +107,7 @@ class TestSQLiteStorage:
         """Test clearing specific endpoint."""
         storage = SQLiteStorage(":memory:")
 
-        reset_time = datetime.utcnow() + timedelta(hours=1)
+        reset_time = utcnow() + timedelta(hours=1)
         rate_limit = RateLimit(
             endpoint="https://api.example.com",
             limit=100,
@@ -124,7 +127,7 @@ class TestSQLiteStorage:
         """Test clearing all data."""
         storage = SQLiteStorage(":memory:")
 
-        reset_time = datetime.utcnow() + timedelta(hours=1)
+        reset_time = utcnow() + timedelta(hours=1)
         storage.set_rate_limit(
             "https://api1.com",
             RateLimit("https://api1.com", 100, 50, reset_time, timedelta(hours=1)),
@@ -153,7 +156,7 @@ class TestSQLiteStorage:
         def worker():
             try:
                 for i in range(50):
-                    reset_time = datetime.utcnow() + timedelta(hours=1)
+                    reset_time = utcnow() + timedelta(hours=1)
                     rate_limit = RateLimit(
                         endpoint=f"https://api{i}.com",
                         limit=100,

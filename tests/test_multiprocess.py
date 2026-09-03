@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import utcnow
 from smartratelimit import RateLimiter
 from smartratelimit.models import RateLimit
 from smartratelimit.storage import SQLiteStorage, RedisStorage
@@ -27,7 +30,7 @@ def redis_available():
 def write_worker_sqlite(db_path, i):
     """Worker function for SQLite concurrent access test (module-level for pickling)."""
     storage = SQLiteStorage(db_path)
-    reset_time = datetime.utcnow() + timedelta(hours=1)
+    reset_time = utcnow() + timedelta(hours=1)
     rate_limit = RateLimit(
         endpoint=f"https://api{i}.com",
         limit=100,

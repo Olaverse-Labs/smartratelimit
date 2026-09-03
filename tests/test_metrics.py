@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 
 import pytest
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import utcnow
 from smartratelimit.metrics import MetricsCollector
 from smartratelimit.models import RateLimitStatus
 
@@ -23,7 +26,7 @@ class TestMetricsCollector:
             endpoint="https://api.example.com",
             limit=100,
             remaining=99,
-            reset_time=datetime.utcnow() + timedelta(hours=1),
+            reset_time=utcnow() + timedelta(hours=1),
         )
 
         collector.record_request("https://api.example.com", 200, status)
@@ -42,7 +45,7 @@ class TestMetricsCollector:
             endpoint="https://api.example.com",
             limit=100,
             remaining=0,
-            reset_time=datetime.utcnow() + timedelta(hours=1),
+            reset_time=utcnow() + timedelta(hours=1),
         )
 
         collector.record_request("https://api.example.com", 429, status)
@@ -71,7 +74,7 @@ class TestMetricsCollector:
             endpoint="https://api.example.com",
             limit=100,
             remaining=98,
-            reset_time=datetime.utcnow() + timedelta(hours=1),
+            reset_time=utcnow() + timedelta(hours=1),
         )
 
         collector.record_request("https://api.example.com", 200, status)
@@ -119,7 +122,7 @@ class TestMetricsCollector:
             endpoint="https://api.example.com",
             limit=100,
             remaining=99,
-            reset_time=datetime.utcnow() + timedelta(hours=1),
+            reset_time=utcnow() + timedelta(hours=1),
         )
 
         collector.record_request("https://api.example.com", 200, status)
@@ -168,7 +171,7 @@ class TestMetricsCollector:
             endpoint="https://api.example.com",
             limit=100,
             remaining=99,
-            reset_time=datetime.utcnow() + timedelta(hours=1),
+            reset_time=utcnow() + timedelta(hours=1),
         )
 
         # Record more than 100 requests

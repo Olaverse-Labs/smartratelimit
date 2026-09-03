@@ -6,6 +6,9 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import to_epoch, utcnow
 from smartratelimit import RateLimiter, RateLimitExceeded
 from smartratelimit.models import RateLimit
 from smartratelimit.storage import MemoryStorage
@@ -91,7 +94,7 @@ class TestRateLimiter:
         mock_response.headers = {
             "X-RateLimit-Limit": "5000",
             "X-RateLimit-Remaining": "4999",
-            "X-RateLimit-Reset": str(int(datetime.utcnow().timestamp()) + 3600),
+            "X-RateLimit-Reset": str(int(to_epoch(utcnow())) + 3600),
         }
         mock_request.return_value = mock_response
 

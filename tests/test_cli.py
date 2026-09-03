@@ -7,6 +7,9 @@ from unittest.mock import patch
 
 import pytest
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import utcnow
 from smartratelimit.cli import cmd_clear, cmd_probe, cmd_status, main
 from smartratelimit.models import RateLimitStatus
 
@@ -25,7 +28,7 @@ class TestCLI:
                     endpoint="https://api.example.com",
                     limit=100,
                     remaining=50,
-                    reset_time=datetime.utcnow() + timedelta(hours=1),
+                    reset_time=utcnow() + timedelta(hours=1),
                     window=timedelta(hours=1),
                 )
 

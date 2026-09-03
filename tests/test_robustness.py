@@ -128,23 +128,36 @@ class TestWindowParsing:
 
 
 class TestNoDeprecatedClock:
-    """utcnow()/utcfromtimestamp() are removed in a future Python."""
+    """``utcnow()`` and ``utcfromtimestamp()`` are removed in a future Python."""
 
-    def test_library_does_not_call_deprecated_datetime_helpers(self):
+    # Assembled rather than written literally so this file contains neither
+    # pattern verbatim and can therefore scan itself. Spelling them out would
+    # force an exemption, and an exemption is where the next one hides.
+    FORBIDDEN = ("datetime." + "utcnow", "datetime." + "utcfromtimestamp")
+
+    def _offenders(self, directory):
         import pathlib
 
-        offenders = []
-        package = pathlib.Path(__file__).resolve().parent.parent / "smartratelimit"
-        for path in package.glob("*.py"):
+        root = pathlib.Path(__file__).resolve().parent.parent / directory
+        found = []
+        for path in sorted(root.glob("*.py")):
             if path.name == "_time.py":
-                continue  # documents them in its docstring
+                continue  # names them in its docstring, by design
             text = path.read_text()
-            # No parentheses in the pattern: `field(default_factory=datetime.utcnow)`
-            # passes the function itself, and a paren-anchored check misses it.
-            if "datetime.utcnow" in text or "datetime.utcfromtimestamp" in text:
-                offenders.append(path.name)
+            # The patterns carry no trailing parenthesis on purpose: passing the
+            # function itself as a `default_factory=` argument is still a use,
+            # and a paren-anchored check walks straight past it. That is exactly
+            # how one survived the first sweep.
+            if any(pattern in text for pattern in self.FORBIDDEN):
+                found.append(f"{directory}/{path.name}")
+        return found
 
-        assert offenders == []
+    def test_library_does_not_call_deprecated_datetime_helpers(self):
+        assert self._offenders("smartratelimit") == []
+
+    def test_tests_do_not_call_deprecated_datetime_helpers(self):
+        """The suite drowned a real signal in 271 deprecation warnings."""
+        assert self._offenders("tests") == []
 
 
 class TestLiveRemaining:
