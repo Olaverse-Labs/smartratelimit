@@ -16,7 +16,7 @@
         <link rel="prev" href="../cli/">
       
       
-        <link rel="next" href="../examples/">
+        <link rel="next" href="../playground/">
       
       
         
@@ -662,6 +662,8 @@
       
         
       
+        
+      
     
     
     
@@ -1069,6 +1071,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../playground/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Playground (live)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1311,6 +1341,11 @@
 <p>No requests are sent. The simulation runs the library's own token buckets on a
 virtual clock, so an hour of traffic is modelled in milliseconds — and the
 answer comes from the same code that paces your real requests.</p>
+<div class="admonition tip">
+<p class="admonition-title">Try it without installing anything</p>
+<p>The <a href="../playground/">Playground</a> runs this same code in your browser via
+Pyodide — real package, real token buckets, sliders instead of flags.</p>
+</div>
 <h2 id="why-bother">Why bother<a class="headerlink" href="#why-bother" title="Permanent link">&para;</a></h2>
 <p>Because the arithmetic is not obvious, and the intuitive answer is usually wrong.</p>
 <p>The scenario above looks like a comfortable fit: 500 requests a minute allowed,

@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://olaverse-labs.github.io/smartratelimit/retry/">
+        <link rel="canonical" href="https://olaverse-labs.github.io/smartratelimit/playground/">
       
       
-        <link rel="prev" href="../async/">
+        <link rel="prev" href="../simulator/">
       
       
-        <link rel="next" href="../metrics/">
+        <link rel="next" href="../examples/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Retry Strategies - smartratelimit</title>
+        <title>Playground (live) - smartratelimit</title>
       
     
     
@@ -100,7 +100,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#retry-strategies" class="md-skip">
+        <a href="#playground" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Retry Strategies
+              Playground (live)
             
           </span>
         </div>
@@ -828,37 +828,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Retry Strategies
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../retry/" class="md-nav__link">
         
   
   
@@ -874,114 +847,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-four-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The four strategies
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#which-statuses-retry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Which statuses retry
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#exceptions-are-retried-too" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Exceptions are retried too
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#async" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Async
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#arguments" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arguments
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#picking-numbers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Picking numbers
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#total-wait-at-a-glance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Total wait, at a glance
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1075,10 +940,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../playground/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Playground (live)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1094,6 +986,48 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#things-worth-trying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Things worth trying
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The point
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1214,10 +1148,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
+  <a href="#things-worth-trying" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration
+        Things worth trying
       
     </span>
   </a>
@@ -1225,76 +1159,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-four-strategies" class="md-nav__link">
+  <a href="#the-point" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The four strategies
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#which-statuses-retry" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Which statuses retry
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#exceptions-are-retried-too" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Exceptions are retried too
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#async" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Async
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#arguments" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arguments
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#picking-numbers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Picking numbers
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#total-wait-at-a-glance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Total wait, at a glance
+        The point
       
     </span>
   </a>
@@ -1321,145 +1189,303 @@
   
 
 
-<h1 id="retry-strategies">Retry Strategies<a class="headerlink" href="#retry-strategies" title="Permanent link">&para;</a></h1>
-<p>Pacing prevents most 429s. Retrying handles the rest — and the 503s and 504s that have nothing to do with rate limits.</p>
-<p><code>RetryHandler</code> wraps <strong>any callable</strong>, not just this library's requests. It inspects the returned object for a status code and decides whether to go again.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimiter</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.retry</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetryConfig</span><span class="p">,</span> <span class="n">RetryHandler</span><span class="p">,</span> <span class="n">RetryStrategy</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">limiter</span> <span class="o">=</span> <span class="n">RateLimiter</span><span class="p">()</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">handler</span> <span class="o">=</span> <span class="n">RetryHandler</span><span class="p">(</span><span class="n">RetryConfig</span><span class="p">(</span><span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">EXPONENTIAL</span><span class="p">))</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"https://api.example.com/data"</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
-</span></code></pre></div>
-<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">RetryConfig</span><span class="p">(</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>                        <span class="c1"># attempts after the first call</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">EXPONENTIAL</span><span class="p">,</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">base_delay</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>                       <span class="c1"># seconds</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">max_delay</span><span class="o">=</span><span class="mf">60.0</span><span class="p">,</span>                       <span class="c1"># ceiling on any single delay</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">backoff_factor</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>                   <span class="c1"># exponential only</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">retry_on_status</span><span class="o">=</span><span class="p">[</span><span class="mi">429</span><span class="p">,</span> <span class="mi">503</span><span class="p">,</span> <span class="mi">504</span><span class="p">],</span>      <span class="c1"># default</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
-</span></code></pre></div>
-<p><code>RetryHandler()</code> with no config uses exactly these defaults.</p>
-<h2 id="the-four-strategies">The four strategies<a class="headerlink" href="#the-four-strategies" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Strategy</th>
-<th>Delay before attempt <em>n</em></th>
-<th>With defaults</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>EXPONENTIAL</code></td>
-<td><code>base_delay × factor^(n-1)</code></td>
-<td>1s, 2s, 4s, 8s…</td>
-</tr>
-<tr>
-<td><code>LINEAR</code></td>
-<td><code>base_delay × n</code></td>
-<td>1s, 2s, 3s, 4s…</td>
-</tr>
-<tr>
-<td><code>FIXED</code></td>
-<td><code>base_delay</code></td>
-<td>1s, 1s, 1s…</td>
-</tr>
-<tr>
-<td><code>NONE</code></td>
-<td><code>0</code></td>
-<td>immediate retries</td>
-</tr>
-</tbody>
-</table>
-<p>Every delay is capped at <code>max_delay</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.retry</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetryConfig</span><span class="p">,</span> <span class="n">RetryStrategy</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Patient: a rate limit that resets on a long window</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">RetryConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">EXPONENTIAL</span><span class="p">,</span> <span class="n">base_delay</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">max_delay</span><span class="o">=</span><span class="mf">120.0</span><span class="p">)</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># Predictable: a flaky upstream where jitter isn't the issue</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">RetryConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">FIXED</span><span class="p">,</span> <span class="n">base_delay</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">max_retries</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Impatient: retry only transient server errors, never rate limits</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">RetryConfig</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">LINEAR</span><span class="p">,</span> <span class="n">retry_on_status</span><span class="o">=</span><span class="p">[</span><span class="mi">502</span><span class="p">,</span> <span class="mi">503</span><span class="p">,</span> <span class="mi">504</span><span class="p">])</span>
-</span></code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Jitter is opt-in</p>
-<p>Delays are deterministic unless you ask for jitter, so a configured schedule
-stays exactly predictable. If many workers hit the same limit at the same
-moment they would otherwise retry in lockstep and collide again — pass
-<code>jitter=0.1</code> to spread them by up to 10% either way. <code>RateLimiter</code> and
-<code>AsyncRateLimiter</code> default their own retries to <code>jitter=0.1</code>.</p>
+<h1 id="playground">Playground<a class="headerlink" href="#playground" title="Permanent link">&para;</a></h1>
+<p>The simulator below is not a mock of smartratelimit. It <strong>is</strong> smartratelimit —
+the real package, installed from PyPI into a Python runtime inside your browser,
+running the same <code>TokenBucket</code> that paces your production requests.</p>
+<p>Nothing is sent anywhere. Everything runs on your machine.</p>
+<div id="srl-playground" class="srl">
+  <div class="srl-status" id="srl-status">
+    <span class="srl-spinner"></span>
+    <span id="srl-status-text">Starting Python in your browser…</span>
+  </div>
+
+  <div class="srl-panel" id="srl-controls" hidden>
+    <div class="srl-controls">
+      <label>Requests per minute
+        <input type="range" id="rpm" min="10" max="5000" step="10" value="500">
+        <output for="rpm" id="rpm-out">500</output>
+      </label>
+      <label>Tokens per minute
+        <input type="range" id="tpm" min="10000" max="1000000" step="10000" value="100000">
+        <output for="tpm" id="tpm-out">100,000</output>
+      </label>
+      <label>Average tokens per request
+        <input type="range" id="avg" min="100" max="20000" step="100" value="2000">
+        <output for="avg" id="avg-out">2,000</output>
+      </label>
+      <label>Requests to send
+        <input type="range" id="reqs" min="10" max="5000" step="10" value="1000">
+        <output for="reqs" id="reqs-out">1,000</output>
+      </label>
+      <label>Concurrent workers
+        <input type="range" id="workers" min="1" max="100" step="1" value="20">
+        <output for="workers" id="workers-out">20</output>
+      </label>
+      <label>API keys
+        <input type="range" id="keys" min="1" max="10" step="1" value="1">
+        <output for="keys" id="keys-out">1</output>
+      </label>
+      <label>Response latency (seconds)
+        <input type="range" id="latency" min="0" max="10" step="0.5" value="0">
+        <output for="latency" id="latency-out">0 — limits only</output>
+      </label>
+    </div>
+    <pre class="srl-out" id="srl-out">—</pre>
+  </div>
 </div>
-<h2 id="which-statuses-retry">Which statuses retry<a class="headerlink" href="#which-statuses-retry" title="Permanent link">&para;</a></h2>
-<p><code>retry_on_status</code> decides. The default <code>[429, 503, 504]</code> covers "you're going too fast" and "the upstream is briefly unwell". Anything else — a 400, a 404, a 500 — is returned immediately, because retrying it will not help.</p>
-<p><code>RateLimiter.request()</code> already retries these statuses on its own, using the same <code>RetryConfig</code> type — pass one as <code>RateLimiter(retry=...)</code> to configure it. Reach for a standalone <code>RetryHandler</code> when you need to retry something that is not a limiter request, or want a different schedule around one particular call.</p>
-<p><code>RetryStrategy.NONE</code> means a single attempt: retrying with a zero delay would just hammer an endpoint that already said no.</p>
-<h2 id="exceptions-are-retried-too">Exceptions are retried too<a class="headerlink" href="#exceptions-are-retried-too" title="Permanent link">&para;</a></h2>
-<p>If the callable raises — a connection reset, a read timeout — the handler waits and tries again on the same schedule. After the last attempt, the final exception is re-raised unchanged:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">handler</span> <span class="o">=</span> <span class="n">RetryHandler</span><span class="p">(</span><span class="n">RetryConfig</span><span class="p">(</span><span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">base_delay</span><span class="o">=</span><span class="mf">1.0</span><span class="p">))</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="p">)</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="k">except</span> <span class="n">requests</span><span class="o">.</span><span class="n">Timeout</span><span class="p">:</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="c1"># all four attempts timed out</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="o">...</span>
-</span></code></pre></div>
-<p>When retries are exhausted on a <em>status code</em> (rather than an exception), the last response is returned rather than raised — check <code>response.status_code</code> afterwards.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="n">url</span><span class="p">))</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="c1"># still rate limited after every retry</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="o">...</span>
-</span></code></pre></div>
-<h2 id="async">Async<a class="headerlink" href="#async" title="Permanent link">&para;</a></h2>
-<p><code>retry_async</code> is the same logic with <code>await asyncio.sleep()</code> between attempts. It reads <code>.status_code</code> or <code>.status</code>, so both httpx and aiohttp responses work:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncRateLimiter</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">smartratelimit.retry</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetryConfig</span><span class="p">,</span> <span class="n">RetryHandler</span><span class="p">,</span> <span class="n">RetryStrategy</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">handler</span> <span class="o">=</span> <span class="n">RetryHandler</span><span class="p">(</span><span class="n">RetryConfig</span><span class="p">(</span><span class="n">max_retries</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="n">RetryStrategy</span><span class="o">.</span><span class="n">EXPONENTIAL</span><span class="p">))</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="k">async</span> <span class="k">with</span> <span class="n">AsyncRateLimiter</span><span class="p">()</span> <span class="k">as</span> <span class="n">limiter</span><span class="p">:</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">call</span><span class="p">():</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="k">return</span> <span class="k">await</span> <span class="n">limiter</span><span class="o">.</span><span class="n">arequest_httpx</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s2">"GET"</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_async</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
-</span></code></pre></div>
-<p>Pass a coroutine <strong>function</strong>, not an already-awaited coroutine — the handler calls it once per attempt.</p>
-<h2 id="arguments">Arguments<a class="headerlink" href="#arguments" title="Permanent link">&para;</a></h2>
-<p>Both methods forward extra arguments to the callable, which is often tidier than a closure:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="k">return</span> <span class="n">limiter</span><span class="o">.</span><span class="n">request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"https://api.github.com/users/</span><span class="si">{</span><span class="n">user</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">response</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">retry_sync</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="s2">"octocat"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-</span></code></pre></div>
-<h2 id="picking-numbers">Picking numbers<a class="headerlink" href="#picking-numbers" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong><code>max_retries</code></strong> — 3 is a reasonable default. Past 5, you are usually queuing work that should be re-run later, not held in memory.</li>
-<li><strong><code>base_delay</code></strong> — start near the API's typical reset granularity. For a per-second limit, 1s; for a per-hour quota, retries won't save you and you want <a href="../concepts/">pacing</a> plus a job queue instead.</li>
-<li><strong><code>max_delay</code></strong> — cap it below your caller's own timeout. An exponential schedule with a 60s ceiling and 5 retries can wait over two minutes in total.</li>
-</ul>
-<h2 id="total-wait-at-a-glance">Total wait, at a glance<a class="headerlink" href="#total-wait-at-a-glance" title="Permanent link">&para;</a></h2>
-<p>Worst case with the defaults (<code>EXPONENTIAL</code>, <code>base_delay=1</code>, <code>factor=2</code>, <code>max_retries=3</code>):</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>attempt 1  →  fail  →  wait 1s
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>attempt 2  →  fail  →  wait 2s
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>attempt 3  →  fail  →  wait 4s
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>attempt 4  →  result returned (or exception raised)
-</span></code></pre></div>
-<p>Seven seconds of waiting, four calls.</p>
+
+<style>
+.srl { margin: 1.2rem 0; }
+.srl-status {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .8rem 1rem; border-radius: .3rem;
+  background: var(--md-code-bg-color); font-size: .8rem;
+}
+.srl-status.srl-error { border-left: .2rem solid #d32f2f; }
+.srl-spinner {
+  width: .9rem; height: .9rem; flex: none; border-radius: 50%;
+  border: 2px solid var(--md-default-fg-color--lightest);
+  border-top-color: var(--md-primary-fg-color);
+  animation: srl-spin .8s linear infinite;
+}
+.srl-status.srl-done .srl-spinner,
+.srl-status.srl-error .srl-spinner { display: none; }
+@keyframes srl-spin { to { transform: rotate(360deg); } }
+.srl-controls {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: .7rem 1.4rem; margin-bottom: 1rem;
+}
+.srl-controls label {
+  display: grid; grid-template-columns: 1fr auto; gap: .1rem .6rem;
+  font-size: .72rem; align-items: center;
+}
+.srl-controls input[type=range] { grid-column: 1; width: 100%; }
+.srl-controls output {
+  grid-column: 2; grid-row: 2; font-family: var(--md-code-font-family);
+  font-size: .7rem; color: var(--md-default-fg-color--light); white-space: nowrap;
+}
+.srl-out {
+  font-family: var(--md-code-font-family); font-size: .72rem; line-height: 1.5;
+  white-space: pre; overflow-x: auto; padding: 1rem;
+  background: var(--md-code-bg-color); border-radius: .3rem; margin: 0;
+}
+.srl-bind { color: #d32f2f; font-weight: 700; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+(function () {
+  var statusEl = document.getElementById("srl-status");
+  var statusText = document.getElementById("srl-status-text");
+  var controls = document.getElementById("srl-controls");
+  var out = document.getElementById("srl-out");
+  var pyodide = null;
+
+  var IDS = ["rpm", "tpm", "avg", "reqs", "workers", "keys", "latency"];
+
+  function say(text, kind) {
+    statusText.textContent = text;
+    statusEl.className = "srl-status" + (kind ? " srl-" + kind : "");
+  }
+
+  function fmt(n) { return Number(n).toLocaleString(); }
+
+  function syncLabels() {
+    document.getElementById("rpm-out").textContent = fmt(rpm.value) + "/min";
+    document.getElementById("tpm-out").textContent = fmt(tpm.value) + "/min";
+    document.getElementById("avg-out").textContent = fmt(avg.value);
+    document.getElementById("reqs-out").textContent = fmt(reqs.value);
+    document.getElementById("workers-out").textContent = workers.value;
+    document.getElementById("keys-out").textContent = keys.value;
+    document.getElementById("latency-out").textContent =
+      latency.value === "0" ? "0 — limits only" : latency.value + "s";
+  }
+
+  // Rendering lives in JS so the Python side stays exactly the library's own
+  // API: build Budgets, call simulate(), hand back the result. Nothing about
+  // the model is reimplemented here.
+  function render(r) {
+    var lines = [];
+    var workersLabel = r.workers + (r.workers === 1 ? " worker" : " workers");
+    var keysLabel = r.keys === 1 ? "" : " and " + r.keys + " keys";
+
+    lines.push("EXPECTED TRAFFIC");
+    lines.push("─".repeat(56));
+    lines.push("  Requests             " + fmt(r.requests) + " over " + workersLabel + keysLabel);
+
+    if (r.achieved_rps === null) {
+      lines.push("  Wall time            instant — the whole workload fit in one burst");
+    } else {
+      var mins = r.wall_seconds / 60;
+      var dur = r.wall_seconds < 90
+        ? r.wall_seconds.toFixed(1) + "s"
+        : (mins < 90 ? mins.toFixed(1) + " min" : (mins / 60).toFixed(1) + " h");
+      lines.push("  Wall time            " + dur);
+      lines.push("  Throughput           " + r.achieved_rps.toFixed(2) + " req/s");
+    }
+
+    lines.push("");
+    // Header built with the same padding as the rows: a hand-counted string
+    // drifts the moment a column width changes, and it already had.
+    function row(name, ceiling, util, blocked) {
+      return "  " + name.padEnd(20) + ceiling.padStart(14) +
+             util.padStart(13) + blocked.padStart(12);
+    }
+    lines.push(row("BUDGET", "CEILING", "UTILISATION", "HELD BACK"));
+    r.budgets.forEach(function (b) {
+      var perMin = b.ceiling_per_minute;
+      var ceiling = perMin >= 1 ? fmt(Math.round(perMin)) + "/min"
+                                : fmt(Math.round(perMin * 60)) + "/h";
+      var mark = b.name === r.binding ? "  <-- binding" : "";
+      lines.push(row(b.name, ceiling,
+                     Math.round(b.utilisation * 100) + "%",
+                     fmt(b.blocked)) + mark);
+    });
+    if (r.concurrency_ceiling_rps !== null) {
+      var cc = fmt(Math.round(r.concurrency_ceiling_rps * 60)) + "/min";
+      var ccBinds = r.binding === null &&
+        r.concurrency_ceiling_rps < Math.min.apply(null,
+          r.budgets.map(function (b) { return b.ceiling_per_minute / 60; }));
+      lines.push(row("concurrency", cc, "—", "—") + (ccBinds ? "  <-- binding" : ""));
+    }
+
+    lines.push("");
+    if (!r.completed) {
+      lines.push("  ! Did not finish within the simulated horizon — these limits are");
+      lines.push("    far below this workload.");
+    } else if (r.binding === null) {
+      lines.push("  No request was ever held back: the limits are not your constraint.");
+    } else {
+      lines.push("  ! " + r.binding + " is the binding budget.");
+      lines.push("    " + fmt(r.throttled) + " of " + fmt(r.requests) + " requests (" +
+                 Math.round(r.throttled_fraction * 100) + "%) waited.");
+    }
+    if (r.burst_affected) {
+      lines.push("");
+      lines.push("  Buckets start full, so this run spent a head start that will not");
+      lines.push("  recur. CEILING is the rate you can actually sustain.");
+    }
+
+    out.textContent = lines.join("\n");
+  }
+
+  function run() {
+    if (!pyodide) return;
+    try {
+      var result = pyodide.runPython(
+        "run_simulation(" + [
+          rpm.value, tpm.value, avg.value, reqs.value, workers.value, keys.value, latency.value
+        ].join(", ") + ")"
+      );
+      render(JSON.parse(result));
+    } catch (err) {
+      out.textContent = String(err.message || err).split("\n").slice(-6).join("\n");
+    }
+  }
+
+  async function boot() {
+    if (typeof loadPyodide !== "function") {
+      say("Could not load Pyodide. A network policy or content blocker may be " +
+          "stopping cdn.jsdelivr.net. The CLI does the same thing offline: " +
+          "smartratelimit simulate --rpm 500 --tpm 100000", "error");
+      return;
+    }
+    try {
+      say("Starting Python in your browser… (~10 MB, first load only)");
+      pyodide = await loadPyodide();
+
+      say("Installing smartratelimit from PyPI…");
+      await pyodide.loadPackage("micropip");
+      await pyodide.runPythonAsync(
+        "import micropip\nawait micropip.install('smartratelimit')"
+      );
+
+      // The simulator arrived after 0.4.0. Say so plainly rather than failing
+      // with an import traceback.
+      var ok = pyodide.runPython(
+        "import importlib.util, smartratelimit\n" +
+        "smartratelimit.__version__ if importlib.util.find_spec('smartratelimit.simulate') else ''"
+      );
+      if (!ok) {
+        var v = pyodide.runPython("import smartratelimit; smartratelimit.__version__");
+        say("The released package (" + v + ") predates the simulator, so this demo " +
+            "cannot run yet. It needs smartratelimit 0.5.0 or newer on PyPI. " +
+            "Meanwhile the CLI does the same thing.", "error");
+        return;
+      }
+
+      pyodide.runPython([
+        "import json",
+        "from datetime import timedelta",
+        "from smartratelimit.simulate import Budget, SimulationError, simulate",
+        "",
+        "MINUTE = timedelta(minutes=1)",
+        "",
+        "def run_simulation(rpm, tpm, avg_tokens, requests, workers, keys, latency):",
+        "    budgets = [",
+        "        Budget('requests', int(rpm), MINUTE, cost=1.0),",
+        "        Budget('tokens', int(tpm), MINUTE, cost=float(avg_tokens)),",
+        "    ]",
+        "    try:",
+        "        r = simulate(budgets, requests=int(requests), workers=int(workers),",
+        "                     keys=int(keys), latency=float(latency))",
+        "    except SimulationError as e:",
+        "        raise ValueError(str(e))",
+        "    return json.dumps({",
+        "        'requests': r.requests, 'workers': r.workers, 'keys': r.keys,",
+        "        'completed': r.completed, 'wall_seconds': r.wall_seconds,",
+        "        'achieved_rps': r.achieved_rps, 'throttled': r.throttled,",
+        "        'throttled_fraction': r.throttled_fraction, 'binding': r.binding,",
+        "        'concurrency_ceiling_rps': r.concurrency_ceiling_rps,",
+        "        'burst_affected': r.burst_affected,",
+        "        'budgets': [{'name': b.name, 'ceiling_per_minute': b.ceiling_rps * 60,",
+        "                     'utilisation': b.utilisation, 'blocked': b.blocked}",
+        "                    for b in r.budgets],",
+        "    })",
+      ].join("\n"));
+
+      var version = pyodide.runPython("import smartratelimit; smartratelimit.__version__");
+      say("Running smartratelimit " + version + " in your browser. Move a slider.", "done");
+      controls.hidden = false;
+      syncLabels();
+      run();
+    } catch (err) {
+      say("Could not start the demo: " + (err.message || err) +
+          " — the CLI does the same thing offline.", "error");
+    }
+  }
+
+  IDS.forEach(function (id) {
+    var el = document.getElementById(id);
+    window[id] = el;
+    el.addEventListener("input", function () { syncLabels(); run(); });
+  });
+
+  syncLabels();
+  boot();
+})();
+</script>
+
+<h2 id="things-worth-trying">Things worth trying<a class="headerlink" href="#things-worth-trying" title="Permanent link">&para;</a></h2>
+<p><strong>Drag <em>Average tokens per request</em> up.</strong> Watch the tokens ceiling collapse while
+the request ceiling sits untouched. At 2,000 tokens against 100,000 a minute you
+get 50 requests a minute — a tenth of a 500 RPM limit.</p>
+<p><strong>Then drag <em>Concurrent workers</em>.</strong> Nothing happens. Concurrency cannot buy
+tokens, and no amount of parallelism moves a budget-bound workload.</p>
+<p><strong>Now raise <em>API keys</em>.</strong> That does move it, because each key carries its own
+budgets — and it beats a straight multiple, since each also brings a full bucket
+to open with.</p>
+<p><strong>Set <em>Response latency</em> to something realistic.</strong> A concurrency row appears. If
+it comes out below every budget, your worker count is the constraint and raising
+a rate limit would change nothing.</p>
+<h2 id="the-point">The point<a class="headerlink" href="#the-point" title="Permanent link">&para;</a></h2>
+<p>Every number here comes from <code>smartratelimit.simulate</code>, which drives the same
+<code>TokenBucket</code> the limiter uses against live traffic. If this page and the library
+ever disagreed, one of them would be wrong — and there is only one implementation
+for them to disagree about.</p>
+<p>For scripting, scenarios beyond requests and tokens, and what this deliberately
+will not tell you about 429s, see <a href="../simulator/">Simulator</a>.</p>
 
 
 
