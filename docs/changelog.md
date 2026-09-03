@@ -4,7 +4,7 @@ All notable changes to smartratelimit. The format follows [Keep a Changelog](htt
 
 Current release: **v{{ smartratelimit_version }}**
 
-## Unreleased
+## 0.5.0
 
 ### Added
 - **`smartratelimit simulate`** — model a workload against a set of rate limits
@@ -30,6 +30,23 @@ Current release: **v{{ smartratelimit_version }}**
   token estimates being estimates. The command says so in its own output.
 - `smartratelimit.simulate` (`Budget`, `simulate`, `SimulationResult`) for the
   same thing from Python.
+
+- Browser playground in the docs: the simulator with sliders, running the
+  library's own modules under Pyodide rather than a JavaScript mock. It loads
+  three stdlib-only modules published alongside the page instead of installing
+  from PyPI — `smartratelimit/__init__.py` eagerly imports `storage`, which
+  imports `sqlite3`, and Pyodide unvendors `sqlite3` from the standard library,
+  so the installed package cannot be imported in a browser at all. Tests assert
+  the published copies stay byte-identical to the package.
+
+### Fixed
+- The test suite called `datetime.utcnow()` in nine files, emitting 271
+  deprecation warnings — enough noise to bury a real one. One was a latent bug
+  rather than a deprecation: `test_core` built a reset header with
+  `datetime.utcnow().timestamp()`, and `.timestamp()` reads a naive datetime as
+  *local* time, so on any machine that is not UTC the header landed hours in the
+  past and the test quietly stopped exercising what it meant to. The guard test
+  now covers `tests/` as well as the package, and scans its own file.
 
 ## 0.4.0
 
