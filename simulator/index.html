@@ -1329,11 +1329,11 @@
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>────────────────────────────────────────────────────
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  Requests             1,000 over 20 workers
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  Wall time            19.0 min
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  Throughput           0.88 req/s   (53/min)
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  Throughput           0.88 req/s   (53 req/min)
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  BUDGET               CEILING        UTILISATION   HELD BACK
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  requests                   500/min           11%           0
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  tokens                      50/min          105%         950 &lt;-- binding
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  BUDGET                 RAW LIMIT COST/REQ EFFECTIVE CEILING   UTIL HELD BACK
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  requests        500 requests/min        1       500 req/min    11%         0
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  tokens        100,000 tokens/min    2,000        50 req/min   105%       950  &lt;-- binding
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  ! tokens is the binding budget.
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    950 of 1,000 requests (95%) waited, 1.2s on average.
@@ -1363,12 +1363,12 @@ the request limit sitting next to it. Adding workers changes nothing:</p>
 real ceiling that the simulator will compare against your budgets:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--rpm<span class="w"> </span><span class="m">500</span><span class="w"> </span>--requests<span class="w"> </span><span class="m">200</span><span class="w"> </span>--workers<span class="w"> </span><span class="m">3</span><span class="w"> </span>--latency<span class="w"> </span><span class="m">2</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>  BUDGET               CEILING        UTILISATION   HELD BACK
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  requests                   500/min           18%           0
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  concurrency                 90/min             —           —  &lt;-- binding
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>  BUDGET                 RAW LIMIT COST/REQ EFFECTIVE CEILING   UTIL HELD BACK
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  requests        500 requests/min        1       500 req/min    18%         0
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  concurrency                    —        —        90 req/min      —         —  &lt;-- binding
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  No request was ever held back: the limits are not your constraint.
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    3 workers at 2.0s each caps you at 90/min, below every budget.
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    3 workers at 2.0s each caps you at 90 req/min, below every budget.
 </span></code></pre></div>
 <p>Worth knowing before you go asking a provider to raise a limit you are nowhere
 near.</p>
@@ -1384,8 +1384,8 @@ four full buckets to open with.</p>
 <code>--cost</code> for what one request spends of it:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>smartratelimit<span class="w"> </span>simulate<span class="w"> </span>--limit<span class="w"> </span><span class="nv">images</span><span class="o">=</span><span class="m">50</span>/1h<span class="w"> </span>--cost<span class="w"> </span><span class="nv">images</span><span class="o">=</span><span class="m">2</span><span class="w"> </span>--requests<span class="w"> </span><span class="m">20</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>  BUDGET               CEILING        UTILISATION   HELD BACK
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  images                        25/h           80%           0
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>  BUDGET                 RAW LIMIT COST/REQ EFFECTIVE CEILING   UTIL HELD BACK
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  images               50 images/h        2          25 req/h    80%         0
 </span></code></pre></div>
 <p>Twenty requests at two images each is 80% of the hourly budget, spent instantly.
 Nothing was throttled — but there is only 20% of the hour left.</p>
@@ -1404,9 +1404,14 @@ you supplied.</p>
 <p>A number like "expect 14.2% 429s" would be a guess wearing a decimal point. This
 command deliberately does not produce one.</p>
 <h2 id="reading-the-output">Reading the output<a class="headerlink" href="#reading-the-output" title="Permanent link">&para;</a></h2>
-<p><strong>CEILING</strong> is the sustained rate a budget permits: its refill rate divided by
-what one request costs. This is the number to plan against.</p>
-<p><strong>UTILISATION above 100%</strong> is the opening burst. Buckets start full, so a run
+<p><strong>RAW LIMIT</strong> is the budget as you configured it, in the units it meters:
+100,000 <em>tokens</em> a minute.</p>
+<p><strong>EFFECTIVE CEILING</strong> is what that becomes once one request's <strong>COST/REQ</strong> comes
+out of it — always requests, whatever the budget itself counts. 100,000 tokens a
+minute at 2,000 tokens a request is 50 <em>requests</em> a minute. This is the number to
+plan against, and the reason both columns are here: "50/min" under a token budget
+invites you to read it as fifty tokens.</p>
+<p><strong>UTIL above 100%</strong> is the opening burst. Buckets start full, so a run
 spends one bucket's worth of head start that will not recur. The report says so
 when it happens.</p>
 <p><strong>HELD BACK</strong> counts requests that particular budget made wait. A budget can

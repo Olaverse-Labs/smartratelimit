@@ -225,7 +225,18 @@ def simulate(
 
         now = epoch + timedelta(seconds=clock)
         for b in spent:
-            buckets[best_key][b.name].consume(b.cost, now=now)
+            bucket = buckets[best_key][b.name]
+            bucket.refill(now)
+            # Charge directly rather than through `consume`. The wait above was
+            # computed as `needed / refill_rate`, so refilling for exactly that
+            # long lands on the cost -- but in floating point it can land a few
+            # ULPs below it, and `consume`'s `tokens >= cost` check then refuses
+            # and returns False. Ignoring that refusal sends the request for
+            # free: over a long run the budget delivers more units than it ever
+            # supplied, and the reported wall clock comes out short. Deducting
+            # unconditionally keeps the books exact; the balance can dip a hair
+            # below zero, which the next `wait_time` charges for.
+            bucket.tokens -= b.cost
 
         completed += 1
         worker_free[w] = clock + latency
