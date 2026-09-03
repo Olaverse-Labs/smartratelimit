@@ -1,6 +1,6 @@
 # CLI
 
-Installing the package puts a `smartratelimit` command on your PATH. It exists mainly to answer two questions from a shell: *what does this API advertise?* and *what quota does my app think it has left?*
+Installing the package puts a `smartratelimit` command on your PATH. It exists mainly to answer three questions from a shell: *what does this API advertise?*, *what quota does my app think it has left?*, and *will this workload fit?*
 
 ```bash
 smartratelimit --help
@@ -120,6 +120,21 @@ Tracked endpoints (2):
 ```
 
 With the default `memory` backend nothing persists between commands, so point `--storage` at the same SQLite or Redis URL your application uses.
+
+## `simulate`
+
+Model a workload against a set of limits without sending anything.
+
+```bash
+smartratelimit simulate --rpm 500 --tpm 100000 \
+    --requests 1000 --workers 20 --avg-tokens 2000
+```
+
+Unlike every other subcommand, this one touches neither the network nor a
+storage backend — `--storage` is irrelevant to it. It exists to answer "which
+budget will bind, and how long will this take?" before you commit to a design.
+
+It has its own page: [Simulator](simulator.md).
 
 ## A working loop
 

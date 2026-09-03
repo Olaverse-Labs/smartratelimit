@@ -109,6 +109,7 @@ nav:
     - Retry Strategies: retry.md
     - Metrics & Monitoring: metrics.md
     - CLI: cli.md
+    - Simulator: simulator.md
   - Recipes: examples.md
   - API Reference: api.md
   - Changelog: changelog.md
