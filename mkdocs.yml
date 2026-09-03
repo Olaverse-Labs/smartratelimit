@@ -110,6 +110,7 @@ nav:
     - Metrics & Monitoring: metrics.md
     - CLI: cli.md
     - Simulator: simulator.md
+    - Playground (live): playground.md
   - Recipes: examples.md
   - API Reference: api.md
   - Changelog: changelog.md
