@@ -1,10 +1,29 @@
 # Playground
 
-The simulator below is not a mock of smartratelimit. It **is** smartratelimit —
-the real package, installed from PyPI into a Python runtime inside your browser,
-running the same `TokenBucket` that paces your production requests.
+The simulator below is not a mock of smartratelimit. It runs the library's own
+simulation modules — copied verbatim from the source this site was built from —
+inside a Python runtime in your browser, driving the same `TokenBucket` that
+paces your production requests.
 
 Nothing is sent anywhere. Everything runs on your machine.
+
+??? note "Why it loads source files rather than installing the package"
+    Two reasons, both worth knowing if you ever try this yourself.
+
+    `smartratelimit/__init__.py` eagerly imports the HTTP and storage stack, and
+    `storage.py` imports `sqlite3` — which Pyodide unvendors from the standard
+    library. Importing the installed package in a browser fails outright.
+
+    And PyPI serves the last *release*, which is not necessarily the code these
+    docs describe. A page demonstrating the docs should run the source the docs
+    were built from.
+
+    So the three modules the simulator needs — `_time`, `models`, `simulate` —
+    are published alongside this page and written straight into Pyodide's
+    filesystem. They import nothing but the standard library, so nothing has to
+    resolve. They are byte-identical to the package, and a test fails if they
+    ever drift. Only the package `__init__` is stubbed, because that is the file
+    that drags in sqlite3.
 
 <div id="srl-playground" class="srl">
   <div class="srl-status" id="srl-status">
@@ -196,6 +215,21 @@ Nothing is sent anywhere. Everything runs on your machine.
     }
   }
 
+  // The three modules the simulator needs, copied into the site by
+  // hooks/playground_modules.py. They import nothing but the standard library,
+  // so there is no package to install and no dependency to resolve — which is
+  // what makes this work at all: smartratelimit's real __init__ pulls in
+  // sqlite3, and Pyodide unvendors sqlite3 from the stdlib.
+  var MODULES = ["__init__.py", "_time.py", "models.py", "simulate.py"];
+
+  function assetsRoot() {
+    // Derive it from a stylesheet the theme always emits, so this works whether
+    // or not the site uses directory URLs.
+    var link = document.querySelector('link[href*="/assets/stylesheets/"]');
+    if (link) return link.href.replace(/\/assets\/stylesheets\/.*$/, "/assets/");
+    return new URL("../assets/", window.location.href).href;
+  }
+
   async function boot() {
     if (typeof loadPyodide !== "function") {
       say("Could not load Pyodide. A network policy or content blocker may be " +
@@ -207,25 +241,21 @@ Nothing is sent anywhere. Everything runs on your machine.
       say("Starting Python in your browser… (~10 MB, first load only)");
       pyodide = await loadPyodide();
 
-      say("Installing smartratelimit from PyPI…");
-      await pyodide.loadPackage("micropip");
-      await pyodide.runPythonAsync(
-        "import micropip\nawait micropip.install('smartratelimit')"
-      );
+      say("Loading smartratelimit…");
+      var base = assetsRoot() + "py/smartratelimit/";
+      var sources = await Promise.all(MODULES.map(async function (name) {
+        var response = await fetch(base + name);
+        if (!response.ok) {
+          throw new Error("could not fetch " + name + " (" + response.status + ")");
+        }
+        return response.text();
+      }));
 
-      // The simulator arrived after 0.4.0. Say so plainly rather than failing
-      // with an import traceback.
-      var ok = pyodide.runPython(
-        "import importlib.util, smartratelimit\n" +
-        "smartratelimit.__version__ if importlib.util.find_spec('smartratelimit.simulate') else ''"
-      );
-      if (!ok) {
-        var v = pyodide.runPython("import smartratelimit; smartratelimit.__version__");
-        say("The released package (" + v + ") predates the simulator, so this demo " +
-            "cannot run yet. It needs smartratelimit 0.5.0 or newer on PyPI. " +
-            "Meanwhile the CLI does the same thing.", "error");
-        return;
-      }
+      pyodide.FS.mkdirTree("/srl/smartratelimit");
+      MODULES.forEach(function (name, i) {
+        pyodide.FS.writeFile("/srl/smartratelimit/" + name, sources[i]);
+      });
+      pyodide.runPython("import sys\nsys.path.insert(0, '/srl')");
 
       pyodide.runPython([
         "import json",
@@ -257,8 +287,7 @@ Nothing is sent anywhere. Everything runs on your machine.
         "    })",
       ].join("\n"));
 
-      var version = pyodide.runPython("import smartratelimit; smartratelimit.__version__");
-      say("Running smartratelimit " + version + " in your browser. Move a slider.", "done");
+      say("Running smartratelimit in your browser. Move a slider.", "done");
       controls.hidden = false;
       syncLabels();
       run();
@@ -301,7 +330,8 @@ a rate limit would change nothing.
 Every number here comes from `smartratelimit.simulate`, which drives the same
 `TokenBucket` the limiter uses against live traffic. If this page and the library
 ever disagreed, one of them would be wrong — and there is only one implementation
-for them to disagree about.
+for them to disagree about. The JavaScript here formats a result; it never
+computes one.
 
 For scripting, scenarios beyond requests and tokens, and what this deliberately
 will not tell you about 429s, see [Simulator](simulator.md).

@@ -89,6 +89,7 @@ markdown_extensions:
 # build time, so the version badge can't drift behind a release.
 hooks:
   - hooks/version.py
+  - hooks/playground_modules.py   # publishes the simulator source for the browser playground
 
 plugins:
   - search:

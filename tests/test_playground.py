@@ -95,22 +95,79 @@ class TestBridgeStillMatchesTheLibrary:
             bridge["run_simulation"](500, 1000, 5000, 5, 1, 1, 0)
 
 
+class TestPublishedModulesMatchTheLibrary:
+    """The page's premise is that it runs the library, not a copy of it."""
+
+    def test_the_hook_publishes_them_verbatim(self, tmp_path):
+        """A drifted copy would make every number on the page a claim, not a fact."""
+        import sys
+
+        sys.path.insert(0, str(PAGE.parent.parent / "hooks"))
+        try:
+            import playground_modules
+        finally:
+            sys.path.pop(0)
+
+        playground_modules.on_post_build({"site_dir": str(tmp_path)})
+        published = tmp_path / "assets" / "py" / "smartratelimit"
+        package = PAGE.parent.parent / "smartratelimit"
+
+        for name in playground_modules.MODULES:
+            assert (published / name).read_bytes() == (package / name).read_bytes(), (
+                f"{name} published to the playground differs from the package"
+            )
+
+    def test_only_the_package_init_is_stubbed(self):
+        """Everything that computes anything must be the real file."""
+        import sys
+
+        sys.path.insert(0, str(PAGE.parent.parent / "hooks"))
+        try:
+            import playground_modules
+        finally:
+            sys.path.pop(0)
+
+        assert "__init__.py" not in playground_modules.MODULES
+        assert "simulate.py" in playground_modules.MODULES
+
+    def test_the_published_modules_need_no_third_party_imports(self):
+        """The whole approach rests on them being stdlib-only under Pyodide."""
+        import re
+        import sys
+
+        sys.path.insert(0, str(PAGE.parent.parent / "hooks"))
+        try:
+            import playground_modules
+        finally:
+            sys.path.pop(0)
+
+        package = PAGE.parent.parent / "smartratelimit"
+        allowed = {"dataclasses", "datetime", "typing", "json", "enum", "math"}
+
+        for name in playground_modules.MODULES:
+            for line in (package / name).read_text().splitlines():
+                match = re.match(r"^(?:from|import)\s+([\w.]+)", line)
+                if not match:
+                    continue
+                root = match.group(1).split(".")[0]
+                assert root in allowed or root == "smartratelimit", (
+                    f"{name} imports {root!r}, which Pyodide may not provide"
+                )
+
+
 class TestPageHonesty:
     """The claims the page makes about itself have to stay true."""
 
-    def test_it_installs_the_real_package(self):
-        """If this ever became a reimplementation, the page's premise dies."""
+    def test_it_runs_the_library_not_a_reimplementation(self):
         page = PAGE.read_text()
 
-        assert "micropip.install('smartratelimit')" in page
         assert "from smartratelimit.simulate import" in page
 
-    def test_it_handles_a_release_without_the_simulator(self):
-        """simulate() postdates 0.4.0, so an old wheel must fail legibly."""
+    def test_it_explains_why_it_does_not_install_the_package(self):
+        """sqlite3 is unvendored under Pyodide; readers deserve the reason."""
         page = PAGE.read_text()
 
-        assert "find_spec('smartratelimit.simulate')" in page
-        assert "0.5.0" in page
+        assert "sqlite3" in page
 
     def test_it_names_an_offline_fallback_when_the_cdn_is_blocked(self):
         page = PAGE.read_text()
