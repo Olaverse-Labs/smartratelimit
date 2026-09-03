@@ -24,6 +24,10 @@ No requests are sent. The simulation runs the library's own token buckets on a
 virtual clock, so an hour of traffic is modelled in milliseconds — and the
 answer comes from the same code that paces your real requests.
 
+!!! tip "Try it without installing anything"
+    The [Playground](playground.md) runs this same code in your browser via
+    Pyodide — real package, real token buckets, sliders instead of flags.
+
 ## Why bother
 
 Because the arithmetic is not obvious, and the intuitive answer is usually wrong.

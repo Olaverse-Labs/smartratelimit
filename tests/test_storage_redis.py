@@ -3,6 +3,9 @@
 import pytest
 from datetime import datetime, timedelta
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import utcnow
 from smartratelimit.models import RateLimit, TokenBucket
 from smartratelimit.storage import RedisStorage
 
@@ -33,7 +36,7 @@ class TestRedisStorage:
         storage = RedisStorage("redis://localhost:6379/0", key_prefix="test:ratelimit:")
         storage.clear()  # Clean up
 
-        reset_time = datetime.utcnow() + timedelta(hours=1)
+        reset_time = utcnow() + timedelta(hours=1)
         rate_limit = RateLimit(
             endpoint="https://api.example.com",
             limit=100,
@@ -85,7 +88,7 @@ class TestRedisStorage:
         storage = RedisStorage("redis://localhost:6379/0", key_prefix="test:ratelimit:")
         storage.clear()  # Clean up
 
-        reset_time = datetime.utcnow() + timedelta(hours=1)
+        reset_time = utcnow() + timedelta(hours=1)
         rate_limit = RateLimit(
             endpoint="https://api.example.com",
             limit=100,
@@ -109,7 +112,7 @@ class TestRedisStorage:
         storage = RedisStorage("redis://localhost:6379/0", key_prefix="test:ratelimit:")
         storage.clear()  # Clean up
 
-        reset_time = datetime.utcnow() + timedelta(hours=1)
+        reset_time = utcnow() + timedelta(hours=1)
         storage.set_rate_limit(
             "https://api1.com",
             RateLimit("https://api1.com", 100, 50, reset_time, timedelta(hours=1)),

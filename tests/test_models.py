@@ -5,6 +5,9 @@ from time import sleep
 
 import pytest
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import utcnow
 from smartratelimit.models import RateLimit, RateLimitStatus, TokenBucket
 
 
@@ -29,7 +32,7 @@ class TestTokenBucket:
         bucket = TokenBucket(capacity=10.0, tokens=2.0, refill_rate=1.0)
         # Freeze time to prevent refill during consume
         from datetime import datetime
-        now = datetime.utcnow()
+        now = utcnow()
         bucket.last_update = now
         assert bucket.consume(5.0, now=now) is False
         # Tokens should remain unchanged (or slightly more due to refill)
@@ -38,7 +41,7 @@ class TestTokenBucket:
     def test_refill(self):
         """Test token refill over time."""
         bucket = TokenBucket(capacity=10.0, tokens=5.0, refill_rate=2.0)
-        initial_time = datetime.utcnow()
+        initial_time = utcnow()
         bucket.last_update = initial_time
         later_time = initial_time + timedelta(seconds=2)
 
@@ -48,7 +51,7 @@ class TestTokenBucket:
     def test_refill_capacity_limit(self):
         """Test refill doesn't exceed capacity."""
         bucket = TokenBucket(capacity=10.0, tokens=9.0, refill_rate=5.0)
-        initial_time = datetime.utcnow()
+        initial_time = utcnow()
         later_time = initial_time + timedelta(seconds=1)
 
         bucket.refill(later_time)
@@ -59,7 +62,7 @@ class TestTokenBucket:
         bucket = TokenBucket(capacity=10.0, tokens=2.0, refill_rate=2.0)
         # Freeze time for consistent calculation
         from datetime import datetime
-        now = datetime.utcnow()
+        now = utcnow()
         bucket.last_update = now
         wait = bucket.wait_time(5.0, now=now)
         assert abs(wait - 1.5) < 0.1  # Need 3 more tokens, at 2/sec = 1.5 seconds
@@ -82,7 +85,7 @@ class TestRateLimitStatus:
 
     def test_basic_properties(self):
         """Test basic status properties."""
-        reset_time = datetime.utcnow() + timedelta(seconds=60)
+        reset_time = utcnow() + timedelta(seconds=60)
         status = RateLimitStatus(
             endpoint="https://api.example.com",
             limit=100,
@@ -117,7 +120,7 @@ class TestRateLimitStatus:
 
     def test_reset_in(self):
         """Test reset_in calculation."""
-        reset_time = datetime.utcnow() + timedelta(seconds=45)
+        reset_time = utcnow() + timedelta(seconds=45)
         status = RateLimitStatus(
             endpoint="https://api.example.com",
             limit=100,
@@ -142,7 +145,7 @@ class TestRateLimit:
 
     def test_to_status(self):
         """Test conversion to RateLimitStatus."""
-        reset_time = datetime.utcnow() + timedelta(minutes=1)
+        reset_time = utcnow() + timedelta(minutes=1)
         rate_limit = RateLimit(
             endpoint="https://api.example.com",
             limit=100,

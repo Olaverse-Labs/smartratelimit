@@ -3,6 +3,9 @@
 import time
 from datetime import datetime, timedelta
 
+# The library stores naive-UTC timestamps; using its own clock helpers
+# keeps these fixtures on exactly the same footing as the code under test.
+from smartratelimit._time import utcnow
 from smartratelimit import RateLimiter
 from smartratelimit.models import RateLimit, TokenBucket
 from smartratelimit.storage import MemoryStorage, SQLiteStorage
@@ -11,7 +14,7 @@ from smartratelimit.storage import MemoryStorage, SQLiteStorage
 def benchmark_memory_storage():
     """Benchmark in-memory storage operations."""
     storage = MemoryStorage()
-    reset_time = datetime.utcnow() + timedelta(hours=1)
+    reset_time = utcnow() + timedelta(hours=1)
 
     # Benchmark set_rate_limit
     start = time.perf_counter()
@@ -49,7 +52,7 @@ def benchmark_memory_storage():
 def benchmark_sqlite_storage():
     """Benchmark SQLite storage operations."""
     storage = SQLiteStorage(":memory:")
-    reset_time = datetime.utcnow() + timedelta(hours=1)
+    reset_time = utcnow() + timedelta(hours=1)
 
     # Benchmark set_rate_limit
     start = time.perf_counter()
