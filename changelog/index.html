@@ -1835,8 +1835,10 @@
   100,000 tokens a minute invited exactly the wrong reading. The table now shows
   <code>RAW LIMIT</code> (the budget as configured, <code>100,000 tokens/min</code>), <code>COST/REQ</code>, and
   <code>EFFECTIVE CEILING</code> (<code>50 req/min</code>) as separate columns, so the arithmetic
-  between them is visible. The CLI and the docs playground render through the
-  same column widths and unit logic.</li>
+  between them is visible. With <code>--keys</code> above 1 the report says which column is
+  per key, since the ceiling is across all of them and the two would otherwise
+  look inconsistent. The CLI and the docs playground render through the same
+  column widths and unit logic.</li>
 <li>The playground's status line and output pane state their foreground colour.
   This theme's code background is dark in both schemes, so inheriting the body
   colour put near-black text on near-black in light mode.</li>
