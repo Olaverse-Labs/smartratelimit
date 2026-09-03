@@ -281,6 +281,19 @@ class TestCLI:
         assert "COST/REQ" in result.stdout
         assert "2,000" in result.stdout
 
+    def test_multiple_keys_say_which_column_is_per_key(self):
+        """4,200 per key beside an 8,400 ceiling needs explaining."""
+        result = run_cli("--rpm", "4200", "--requests", "100", "--keys", "2")
+
+        assert "4,200 requests/min" in result.stdout
+        assert "8,400 req/min" in result.stdout
+        assert "RAW LIMIT is per key" in result.stdout
+
+    def test_one_key_needs_no_such_note(self):
+        result = run_cli("--rpm", "4200", "--requests", "100")
+
+        assert "per key" not in result.stdout
+
     def test_table_columns_line_up(self):
         result = run_cli("--rpm", "4410", "--tpm", "100000", "--avg-tokens", "2000",
                          "--requests", "1000", "--workers", "20", "--latency", "1")

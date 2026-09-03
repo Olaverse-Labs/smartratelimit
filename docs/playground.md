@@ -182,7 +182,8 @@ Nothing is sent anywhere. Everything runs on your machine.
         ? r.wall_seconds.toFixed(1) + "s"
         : (mins < 90 ? mins.toFixed(1) + " min" : (mins / 60).toFixed(1) + " h");
       lines.push("  Wall time            " + dur);
-      lines.push("  Throughput           " + r.achieved_rps.toFixed(2) + " req/s");
+      lines.push("  Throughput           " + r.achieved_rps.toFixed(2) + " req/s" +
+                 "   (" + rate(r.achieved_rps, "req") + ")");
     }
 
     lines.push("");
@@ -212,6 +213,12 @@ Nothing is sent anywhere. Everything runs on your machine.
       lines.push(row("concurrency", "—", "—",
                      rate(r.concurrency_ceiling_rps, "req"), "—", "—") +
                  (ccBinds ? "  <-- binding" : ""));
+    }
+    if (r.keys > 1) {
+      // Otherwise the columns invite arithmetic that does not close: a 4,200
+      // per-minute limit over two keys shows an 8,400 ceiling beside it.
+      lines.push("  RAW LIMIT is per key. EFFECTIVE CEILING is across all " +
+                 r.keys + " keys.");
     }
 
     lines.push("");
@@ -314,7 +321,10 @@ Nothing is sent anywhere. Everything runs on your machine.
         "        'throttled_fraction': r.throttled_fraction, 'binding': r.binding,",
         "        'concurrency_ceiling_rps': r.concurrency_ceiling_rps,",
         "        'burst_affected': r.burst_affected,",
-        "        'budgets': [{'name': b.name, 'ceiling_per_minute': b.ceiling_rps * 60,",
+        "        'budgets': [{'name': b.name, 'limit': b.limit,",
+        "                     'window_seconds': b.window.total_seconds(),",
+        "                     'cost_per_request': b.cost,",
+        "                     'ceiling_per_minute': b.ceiling_rps * 60,",
         "                     'utilisation': b.utilisation, 'blocked': b.blocked}",
         "                    for b in r.budgets],",
         "    })",
