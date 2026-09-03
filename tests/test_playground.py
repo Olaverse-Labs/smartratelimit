@@ -17,13 +17,26 @@ import pytest
 
 PAGE = pathlib.Path(__file__).resolve().parent.parent / "docs" / "playground.md"
 
-# Every key the page's JavaScript renderer reads off the payload.
-REQUIRED_KEYS = {
-    "requests", "workers", "keys", "completed", "wall_seconds", "achieved_rps",
-    "throttled", "throttled_fraction", "binding", "concurrency_ceiling_rps",
-    "burst_affected", "budgets",
-}
-REQUIRED_BUDGET_KEYS = {"name", "ceiling_per_minute", "utilisation", "blocked"}
+def _render_source():
+    """The body of the page's JavaScript renderer."""
+    page = PAGE.read_text()
+    start = page.index("  function render(r) {")
+    end = page.index("  function run() {", start)
+    return page[start:end]
+
+
+def _fields_read_off(variable, source):
+    """Property names the renderer reads off ``variable``, minus method calls."""
+    pattern = r"\b" + variable + r"\.([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*\()"
+    return set(re.findall(pattern, source))
+
+
+# Derived from the renderer rather than listed by hand. A hand-kept list is one
+# more thing to forget: the columns gained RAW LIMIT and COST/REQ while this list
+# stayed as it was, so the test went on passing while the page rendered "NaN".
+_RENDER = _render_source()
+REQUIRED_KEYS = _fields_read_off("r", _RENDER)
+REQUIRED_BUDGET_KEYS = _fields_read_off("b", _RENDER)
 
 
 def extract_bridge():
@@ -53,10 +66,34 @@ class TestBridgeStillMatchesTheLibrary:
         assert callable(bridge["run_simulation"])
 
     def test_it_produces_the_payload_the_renderer_reads(self, bridge):
+        # The renderer is JavaScript: a key the payload omits is `undefined`,
+        # which formats as "NaN" rather than raising. Nothing on the page would
+        # tell you, so this is where it has to be caught.
+        assert REQUIRED_KEYS, "scraped no fields off the renderer"
+        assert REQUIRED_BUDGET_KEYS, "scraped no budget fields off the renderer"
+
         payload = json.loads(bridge["run_simulation"](500, 100000, 2000, 1000, 20, 1, 0))
 
-        assert REQUIRED_KEYS <= set(payload)
-        assert REQUIRED_BUDGET_KEYS <= set(payload["budgets"][0])
+        assert not REQUIRED_KEYS - set(payload), (
+            f"renderer reads {sorted(REQUIRED_KEYS - set(payload))} "
+            f"but the bridge does not send it"
+        )
+        budget = payload["budgets"][0]
+        assert not REQUIRED_BUDGET_KEYS - set(budget), (
+            f"renderer reads {sorted(REQUIRED_BUDGET_KEYS - set(budget))} off each "
+            f"budget but the bridge does not send it"
+        )
+
+    def test_every_number_the_renderer_prints_is_a_number(self, bridge):
+        """`undefined` arithmetic yields NaN, which prints without complaint."""
+        payload = json.loads(bridge["run_simulation"](4200, 128000, 2000, 1000, 20, 2, 3))
+
+        for budget in payload["budgets"]:
+            for key in ("limit", "window_seconds", "cost_per_request",
+                        "ceiling_per_minute", "utilisation"):
+                value = budget[key]
+                assert isinstance(value, (int, float)), (budget["name"], key, value)
+                assert value == value, (budget["name"], key)  # not NaN
 
     def test_it_agrees_with_the_library_it_wraps(self, bridge):
         """The page must not quietly compute something of its own."""

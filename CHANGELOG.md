@@ -31,8 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   100,000 tokens a minute invited exactly the wrong reading. The table now shows
   `RAW LIMIT` (the budget as configured, `100,000 tokens/min`), `COST/REQ`, and
   `EFFECTIVE CEILING` (`50 req/min`) as separate columns, so the arithmetic
-  between them is visible. The CLI and the docs playground render through the
-  same column widths and unit logic.
+  between them is visible. With `--keys` above 1 the report says which column is
+  per key, since the ceiling is across all of them and the two would otherwise
+  look inconsistent. The CLI and the docs playground render through the same
+  column widths and unit logic.
 - The playground's status line and output pane state their foreground colour.
   This theme's code background is dark in both schemes, so inheriting the body
   colour put near-black text on near-black in light mode.

@@ -397,6 +397,14 @@ def _print_simulation(result):
             + marker
         )
 
+    if result.keys > 1:
+        # Otherwise the columns invite arithmetic that does not close: a 4,200
+        # per-minute limit over two keys shows an 8,400 ceiling beside it.
+        print(
+            f"  RAW LIMIT is per key. EFFECTIVE CEILING is across all "
+            f"{result.keys} keys."
+        )
+
     print()
     if not result.completed:
         print("  ! Did not finish within the simulated horizon — the limits are far")
